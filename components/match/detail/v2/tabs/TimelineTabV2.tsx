@@ -2,15 +2,14 @@
  * TimelineTabV2 - Tab de Timeline Visual
  * ======================================
  * 
- * Muestra el timeline del partido de forma visual:
- * - Juegos agrupados por set
- * - Indicadores de break
- * - Visualización de quién ganó cada juego
+ * Carga timeline bajo demanda desde /v2/matches/{id}/timeline
+ * Muestra juegos agrupados por set con indicadores de break.
  */
 
-import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { GameInfo, MatchFullResponse, SetTimeline, getShortName } from '../../../../../src/types/matchDetail';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import apiClient from '../../../../../src/services/api/apiClient';
+import { GameInfo, MatchFullResponse, MatchTimeline, SetTimeline, getShortName } from '../../../../../src/types/matchDetail';
 import { COLORS } from '../../../../../src/utils/constants';
 
 interface TimelineTabV2Props {
@@ -18,14 +17,54 @@ interface TimelineTabV2Props {
 }
 
 export default function TimelineTabV2({ data }: TimelineTabV2Props) {
-    const { timeline, player1, player2 } = data;
+    const [timeline, setTimeline] = useState<MatchTimeline | null>(data.timeline || null);
+    const [loading, setLoading] = useState(!data.timeline?.sets?.length);
+    const [error, setError] = useState<string | null>(null);
 
+    const { player1, player2 } = data;
     const p1Short = getShortName(player1.name);
     const p2Short = getShortName(player2.name);
     const p1Initial = p1Short.charAt(0).toUpperCase();
     const p2Initial = p2Short.charAt(0).toUpperCase();
 
-    if (!timeline || timeline.sets.length === 0) {
+    useEffect(() => {
+        // Si ya tenemos timeline con datos, no cargar
+        if (data.timeline?.sets?.length) {
+            setTimeline(data.timeline);
+            setLoading(false);
+            return;
+        }
+        
+        // Cargar timeline bajo demanda
+        loadTimeline();
+    }, [data.match.id]);
+
+    const loadTimeline = async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            const response = await apiClient.get<MatchTimeline>(`/v2/matches/${data.match.id}/timeline`);
+            setTimeline(response.data);
+        } catch (err) {
+            setError('Error al cargar timeline');
+            console.error('Error loading timeline:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Loading
+    if (loading) {
+        return (
+            <View style={styles.centerContainer}>
+                <ActivityIndicator size="large" color={COLORS.primary} />
+                <Text style={styles.loadingText}>Cargando timeline...</Text>
+            </View>
+        );
+    }
+
+    // Error or no data
+    if (error || !timeline || !timeline.sets?.length) {
         return (
             <View style={styles.emptyContainer}>
                 <Text style={styles.emptyIcon}>📈</Text>
@@ -111,41 +150,41 @@ interface SetTimelineCardProps {
 }
 
 function SetTimelineCard({ set, p1Initial, p2Initial, p1Name, p2Name }: SetTimelineCardProps) {
-    const { set_number, games, final_score, has_tiebreak, tiebreak_score, breaks_player1, breaks_player2 } = set;
+    const p1GamesWon = set.games.filter(g => g.winner === 1).length;
+    const p2GamesWon = set.games.filter(g => g.winner === 2).length;
+    const setWinner = p1GamesWon > p2GamesWon ? 1 : 2;
 
     return (
         <View style={styles.setCard}>
             {/* Set Header */}
             <View style={styles.setHeader}>
-                <View style={styles.setTitleRow}>
-                    <Text style={styles.setTitle}>Set {set_number}</Text>
-                    {has_tiebreak && (
-                        <View style={styles.tiebreakBadge}>
-                            <Text style={styles.tiebreakText}>TB</Text>
-                        </View>
-                    )}
-                </View>
-                <View style={styles.setScoreContainer}>
-                    <Text style={styles.setScore}>{final_score}</Text>
-                    {tiebreak_score && (
-                        <Text style={styles.setTiebreak}>({tiebreak_score})</Text>
-                    )}
-                </View>
-            </View>
-
-            {/* Break Summary */}
-            {(breaks_player1 > 0 || breaks_player2 > 0) && (
-                <View style={styles.breakSummary}>
-                    <Text style={styles.breakSummaryText}>
-                        Breaks: {p1Name} {breaks_player1} - {breaks_player2} {p2Name}
+                <Text style={styles.setTitle}>Set {set.set_number}</Text>
+                <View style={styles.setScore}>
+                    <Text style={[
+                        styles.setScoreNum,
+                        setWinner === 1 && styles.setScoreNumWinner
+                    ]}>
+                        {p1GamesWon}
+                    </Text>
+                    <Text style={styles.setScoreDash}>-</Text>
+                    <Text style={[
+                        styles.setScoreNum,
+                        setWinner === 2 && styles.setScoreNumWinner
+                    ]}>
+                        {p2GamesWon}
                     </Text>
                 </View>
-            )}
+                {set.breaks_p1 > 0 || set.breaks_p2 > 0 ? (
+                    <Text style={styles.setBreaks}>
+                        Breaks: {set.breaks_p1}-{set.breaks_p2}
+                    </Text>
+                ) : null}
+            </View>
 
             {/* Games Grid */}
             <View style={styles.gamesGrid}>
-                {games.map((game, idx) => (
-                    <GameCell 
+                {set.games.map((game, idx) => (
+                    <GameBox 
                         key={idx}
                         game={game}
                         p1Initial={p1Initial}
@@ -153,47 +192,38 @@ function SetTimelineCard({ set, p1Initial, p2Initial, p1Name, p2Name }: SetTimel
                     />
                 ))}
             </View>
-
-            {/* Score Progression */}
-            <View style={styles.progressionRow}>
-                {games.map((game, idx) => (
-                    <Text key={idx} style={styles.progressionScore}>
-                        {game.score_after}
-                    </Text>
-                ))}
-            </View>
         </View>
     );
 }
 
 // ============================================================
-// GAME CELL
+// GAME BOX
 // ============================================================
 
-interface GameCellProps {
+interface GameBoxProps {
     game: GameInfo;
     p1Initial: string;
     p2Initial: string;
 }
 
-function GameCell({ game, p1Initial, p2Initial }: GameCellProps) {
-    const isP1Win = game.winner === 1;
+function GameBox({ game, p1Initial, p2Initial }: GameBoxProps) {
+    const isP1 = game.winner === 1;
     const isBreak = game.is_break;
-    const initial = isP1Win ? p1Initial : p2Initial;
+    const initial = isP1 ? p1Initial : p2Initial;
 
     return (
         <View style={[
-            styles.gameCell,
-            isP1Win ? styles.gameCellP1 : styles.gameCellP2,
-            isBreak && styles.gameCellBreak,
+            styles.gameBox,
+            isP1 ? styles.gameBoxP1 : styles.gameBoxP2,
+            isBreak && styles.gameBoxBreak
         ]}>
             <Text style={[
-                styles.gameCellInitial,
-                isBreak && styles.gameCellInitialBreak,
+                styles.gameInitial,
+                isP1 ? styles.gameInitialP1 : styles.gameInitialP2
             ]}>
                 {initial}
             </Text>
-            {isBreak && <View style={styles.gameCellBreakDot} />}
+            {isBreak && <View style={styles.gameBreakDot} />}
         </View>
     );
 }
@@ -212,6 +242,18 @@ const styles = StyleSheet.create({
         paddingBottom: 32,
         gap: 16,
     },
+    centerContainer: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 40,
+        backgroundColor: COLORS.background,
+    },
+    loadingText: {
+        marginTop: 12,
+        fontSize: 14,
+        color: COLORS.textSecondary,
+    },
 
     // Summary Card
     summaryCard: {
@@ -229,68 +271,58 @@ const styles = StyleSheet.create({
     summaryValue: {
         fontSize: 28,
         fontWeight: '800',
-        color: COLORS.primary,
+        color: COLORS.textPrimary,
     },
     summaryLabel: {
         fontSize: 12,
-        fontWeight: '600',
+        fontWeight: '500',
         color: COLORS.textSecondary,
         marginTop: 4,
     },
     summaryDivider: {
         width: 1,
         backgroundColor: COLORS.border,
-        marginHorizontal: 16,
+        marginVertical: 4,
     },
 
     // Legend
     legend: {
         flexDirection: 'row',
         justifyContent: 'center',
-        gap: 20,
-        backgroundColor: COLORS.surface,
-        borderRadius: 12,
-        padding: 12,
-        borderWidth: 1,
-        borderColor: COLORS.border,
+        gap: 24,
+        paddingVertical: 8,
     },
     legendItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
+        gap: 8,
     },
     legendBox: {
-        width: 28,
-        height: 28,
+        width: 24,
+        height: 24,
         borderRadius: 6,
         alignItems: 'center',
         justifyContent: 'center',
     },
     legendBoxP1: {
-        backgroundColor: COLORS.primary + '20',
-        borderWidth: 1,
-        borderColor: COLORS.primary,
+        backgroundColor: COLORS.primary,
     },
     legendBoxP2: {
-        backgroundColor: COLORS.success + '20',
-        borderWidth: 1,
-        borderColor: COLORS.success,
+        backgroundColor: COLORS.success,
     },
     legendBoxBreak: {
-        backgroundColor: COLORS.danger + '20',
-        borderWidth: 1,
-        borderColor: COLORS.danger,
+        backgroundColor: COLORS.warning,
     },
     legendInitial: {
         fontSize: 12,
         fontWeight: '700',
-        color: COLORS.textPrimary,
+        color: '#FFF',
     },
     breakDot: {
         width: 8,
         height: 8,
         borderRadius: 4,
-        backgroundColor: COLORS.danger,
+        backgroundColor: '#FFF',
     },
     legendText: {
         fontSize: 12,
@@ -308,122 +340,88 @@ const styles = StyleSheet.create({
     },
     setHeader: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 12,
-    },
-    setTitleRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
+        marginBottom: 16,
     },
     setTitle: {
         fontSize: 16,
         fontWeight: '700',
         color: COLORS.textPrimary,
-    },
-    tiebreakBadge: {
-        backgroundColor: COLORS.warning,
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 4,
-    },
-    tiebreakText: {
-        fontSize: 10,
-        fontWeight: '700',
-        color: '#FFF',
-    },
-    setScoreContainer: {
-        flexDirection: 'row',
-        alignItems: 'baseline',
-        gap: 4,
+        flex: 1,
     },
     setScore: {
-        fontSize: 18,
-        fontWeight: '800',
-        color: COLORS.primary,
-    },
-    setTiebreak: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: COLORS.textSecondary,
-    },
-
-    // Break Summary
-    breakSummary: {
+        flexDirection: 'row',
+        alignItems: 'center',
         backgroundColor: COLORS.background,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
         borderRadius: 8,
-        padding: 8,
-        marginBottom: 12,
+        marginRight: 12,
     },
-    breakSummaryText: {
-        fontSize: 12,
-        fontWeight: '600',
+    setScoreNum: {
+        fontSize: 18,
+        fontWeight: '700',
         color: COLORS.textSecondary,
-        textAlign: 'center',
+    },
+    setScoreNumWinner: {
+        color: COLORS.textPrimary,
+    },
+    setScoreDash: {
+        fontSize: 14,
+        color: COLORS.textSecondary,
+        marginHorizontal: 4,
+    },
+    setBreaks: {
+        fontSize: 11,
+        fontWeight: '500',
+        color: COLORS.textSecondary,
     },
 
     // Games Grid
     gamesGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 6,
-        marginBottom: 8,
+        gap: 8,
     },
-
-    // Game Cell
-    gameCell: {
-        width: 36,
-        height: 36,
+    gameBox: {
+        width: 32,
+        height: 32,
         borderRadius: 8,
         alignItems: 'center',
         justifyContent: 'center',
         position: 'relative',
     },
-    gameCellP1: {
+    gameBoxP1: {
         backgroundColor: COLORS.primary + '20',
-        borderWidth: 1,
-        borderColor: COLORS.primary + '40',
+        borderWidth: 2,
+        borderColor: COLORS.primary,
     },
-    gameCellP2: {
+    gameBoxP2: {
         backgroundColor: COLORS.success + '20',
-        borderWidth: 1,
-        borderColor: COLORS.success + '40',
+        borderWidth: 2,
+        borderColor: COLORS.success,
     },
-    gameCellBreak: {
-        backgroundColor: COLORS.danger + '20',
-        borderColor: COLORS.danger,
+    gameBoxBreak: {
+        borderStyle: 'dashed',
     },
-    gameCellInitial: {
-        fontSize: 14,
+    gameInitial: {
+        fontSize: 12,
         fontWeight: '700',
-        color: COLORS.textPrimary,
     },
-    gameCellInitialBreak: {
-        color: COLORS.danger,
+    gameInitialP1: {
+        color: COLORS.primary,
     },
-    gameCellBreakDot: {
+    gameInitialP2: {
+        color: COLORS.success,
+    },
+    gameBreakDot: {
         position: 'absolute',
-        top: 3,
-        right: 3,
-        width: 6,
-        height: 6,
-        borderRadius: 3,
-        backgroundColor: COLORS.danger,
-    },
-
-    // Score Progression
-    progressionRow: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 6,
-    },
-    progressionScore: {
-        width: 36,
-        fontSize: 9,
-        fontWeight: '500',
-        color: COLORS.textSecondary,
-        textAlign: 'center',
+        bottom: -2,
+        right: -2,
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: COLORS.warning,
     },
 
     // Empty State

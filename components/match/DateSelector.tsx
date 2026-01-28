@@ -83,6 +83,7 @@ export default function DateSelector({ dates, selectedDate, onDateSelect }: Date
     );
 }
 
+
 const styles = StyleSheet.create({
     container: {
         backgroundColor: COLORS.surface,
@@ -98,7 +99,7 @@ const styles = StyleSheet.create({
         height: 64,
         marginHorizontal: 4,
         borderRadius: 12,
-        backgroundColor: COLORS.background,
+        backgroundColor: COLORS.background, // Should be tertiary or darker? Guide says "Filter Chips".
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
@@ -108,19 +109,26 @@ const styles = StyleSheet.create({
     dateItemSelected: {
         backgroundColor: COLORS.primary,
         borderColor: COLORS.primary,
+        shadowColor: COLORS.primary,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.4,
+        shadowRadius: 8,
+        elevation: 4,
     },
     dateItemToday: {
         borderColor: COLORS.primary,
-        borderWidth: 2,
+        borderWidth: 1,
     },
     dayName: {
         fontSize: 12,
         fontWeight: '600',
         color: COLORS.textSecondary,
         marginBottom: 4,
+        textTransform: 'uppercase',
     },
     dayNameSelected: {
-        color: '#FFFFFF',
+        color: '#0A1929', // Dark color for contrast against Neon Green
+        fontWeight: '700',
     },
     dayNameToday: {
         color: COLORS.primary,
@@ -131,7 +139,7 @@ const styles = StyleSheet.create({
         color: COLORS.textPrimary,
     },
     dayNumberSelected: {
-        color: '#FFFFFF',
+        color: '#0A1929', // Dark color for contrast
     },
     dayNumberToday: {
         color: COLORS.primary,
@@ -145,6 +153,6 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.primary,
     },
     todayDotSelected: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: '#0A1929',
     },
 });

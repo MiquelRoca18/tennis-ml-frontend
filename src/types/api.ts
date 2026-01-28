@@ -3,12 +3,26 @@
 export type Surface = 'Hard' | 'Clay' | 'Grass' | 'Carpet';
 export type MatchState = 'pendiente' | 'en_juego' | 'completado' | 'cancelado';
 export type Confidence = 'Alta' | 'Media' | 'Baja';
+export type ConfidenceLevel = 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN';
 export type StatsPeriod = '7d' | '30d' | 'all';
+
+export interface Bookmaker {
+    bookmaker: string;
+    odds: number;
+    is_best: boolean;
+}
+
+export interface CuotasTop3 {
+    top3_player1: Bookmaker[];
+    top3_player2: Bookmaker[];
+}
 
 export interface Player {
     nombre: string;
+    key: string;              // 🆕 ID del jugador en API-Tennis
     ranking: number | null;
     cuota: number;
+    logo: string;             // 🆕 URL del logo del jugador
 }
 
 export interface Prediction {
@@ -27,23 +41,64 @@ export interface Prediction {
     confianza: Confidence;
     kelly_stake_jugador1: number | null;
     kelly_stake_jugador2: number | null;
+    // New confidence system fields
+    confidence_level?: ConfidenceLevel;
+    confidence_score?: number;
+    player1_known?: boolean;
+    player2_known?: boolean;
+}
+
+// Score de un set individual (para marcador detallado)
+export interface SetScoreSimple {
+    set_number: number;
+    player1_score: number;
+    player2_score: number;
+    tiebreak_score?: string | null;  // Ej: "7-5" si hubo tiebreak
+}
+
+// Datos en vivo del partido (solo cuando está en juego)
+export interface LiveData {
+    current_game_score?: string | null;  // Ej: "30-15", "40-30", "Deuce"
+    current_server?: string | null;      // "First Player" o "Second Player"
+    current_set?: number | null;         // Set actual (1, 2, 3...)
+    current_game?: number | null;        // Juego actual del set
+    is_tiebreak: boolean;
+}
+
+// Marcador completo del partido
+export interface MatchScores {
+    sets_result?: string | null;   // Resultado en sets (ej: "2-0", "2-1")
+    sets: SetScoreSimple[];        // Score detallado por set
+    live?: LiveData | null;        // Datos en vivo (solo si está en juego)
 }
 
 export interface MatchResult {
-    ganador: string;
-    marcador: string;
+    ganador?: string | null;
+    marcador?: string | null;      // Formato string: "6-4, 7-5, 6-3"
+    scores?: MatchScores | null;   // 🆕 Scores estructurados (sets, live data)
+    apostamos?: boolean;           // Si apostamos en este partido
+    resultado_apuesta?: string;    // 'ganada' | 'perdida'
+    stake?: number;                // Cantidad apostada
+    ganancia?: number;             // Ganancia/pérdida
+    roi?: number;                  // Return on Investment
 }
 
 export interface Match {
     id: number;
+    event_key: string;        // 🆕 ID único en API-Tennis
     estado: MatchState;
+    is_live: boolean;         // 🆕 Estado en vivo
+    is_qualification: boolean; // 🆕 Si es clasificación
     fecha_partido: string;
     hora_inicio: string | null;
     torneo: string | null;
+    tournament_key: string;   // 🆕 ID del torneo
+    tournament_season: string; // 🆕 Temporada (ej: "2026")
     ronda: string | null;
     superficie: Surface;
     jugador1: Player;
     jugador2: Player;
+    cuotas_top3: CuotasTop3;  // 🆕 Top 3 cuotas
     prediccion: Prediction;
     resultado: MatchResult | null;
 }
@@ -178,4 +233,389 @@ export interface HealthResponse {
     model_loaded: boolean;
     database_connected: boolean;
     version: string;
+}
+
+// ============================================
+// MATCH STATISTICS TYPES
+// ============================================
+
+// Estadísticas por Set
+export interface SetScore {
+    set: number;
+    jugador1: number;
+    jugador2: number;
+}
+
+// Estadísticas Básicas
+export interface EstadisticasBasicas {
+    total_sets: number;
+    sets_ganados_jugador1: number;
+    sets_ganados_jugador2: number;
+    total_juegos: number;
+    juegos_ganados_jugador1: number;
+    juegos_ganados_jugador2: number;
+    marcador_por_sets: SetScore[];
+}
+
+// Estadísticas Avanzadas por Jugador
+export interface EstadisticasJugador {
+    juegos_al_saque: number;
+    juegos_ganados_al_saque: number;
+    porcentaje_saque: number;
+    break_points_enfrentados: number;
+    break_points_salvados: number;
+    break_points_a_favor: number;
+    break_points_convertidos: number;
+    puntos_totales: number;
+}
+
+export interface EstadisticasAvanzadas {
+    jugador1: EstadisticasJugador;
+    jugador2: EstadisticasJugador;
+}
+
+// Timeline Entry
+export interface TimelineEntry {
+    set: string;
+    juego: string;
+    servidor: string;
+    ganador: string;
+    marcador_juegos: string;
+    marcador_sets: string;
+    fue_break: boolean;
+}
+
+// Momentum Entry
+export interface MomentumEntry {
+    juego: number;
+    set: string;
+    momentum: number;  // -100 a +100
+    dominando: 'jugador1' | 'jugador2' | 'equilibrado';
+}
+
+// Punto Clave
+export type PuntoClaveType = 'break_point' | 'set_point' | 'match_point';
+
+export interface PuntoClave {
+    tipo: PuntoClaveType;
+    set: string;
+    juego: string;
+    punto: string;
+    marcador: string;
+    descripcion: string;
+}
+
+// Response de /matches/{id}/details
+export interface MatchDetailsResponse {
+    match_id: number;
+    estado: MatchState;
+    ganador: string;
+    duracion_estimada: string | null;
+    estadisticas_basicas: EstadisticasBasicas;
+    estadisticas_avanzadas: EstadisticasAvanzadas | null;
+}
+
+// Response de /matches/{id}/analysis
+export interface MatchAnalysisResponse extends MatchDetailsResponse {
+    timeline: TimelineEntry[];
+    momentum: MomentumEntry[];
+    puntos_clave: PuntoClave[];
+}
+
+// ============================================
+// ELITE API TYPES
+// ============================================
+
+// Player Types
+export interface Player {
+    player_key: number;
+    player_name: string;
+    player_country: string | null;
+    player_birthday: string | null;
+    player_logo: string | null;
+    atp_ranking: number | null;
+    wta_ranking: number | null;
+    ranking_movement: 'up' | 'down' | 'same' | null;
+    ranking_points: number | null;
+    last_updated: string;
+    created_at: string;
+    stats?: PlayerStats[];
+}
+
+export interface PlayerStats {
+    season: number;
+    type: 'singles' | 'doubles';
+    rank: number;
+    titles: number;
+    matches_won: number;
+    matches_lost: number;
+    hard_won: number;
+    hard_lost: number;
+    clay_won: number;
+    clay_lost: number;
+    grass_won: number;
+    grass_lost: number;
+}
+
+export interface PlayerMatch {
+    id: number;
+    fecha_partido: string;
+    torneo: string;
+    superficie: string;
+    jugador1_nombre: string;
+    jugador2_nombre: string;
+    resultado_ganador: string | null;
+    resultado_marcador: string | null;
+    estado: MatchState;
+}
+
+export interface PlayerMatchesResponse {
+    player_key: number;
+    total_matches: number;
+    matches: PlayerMatch[];
+}
+
+export interface PlayerStatsResponse {
+    player_key: number;
+    surface: string | null;
+    season: number | null;
+    stats: {
+        surface: string;
+        won: number;
+        lost: number;
+        total: number;
+        win_percentage: number;
+    };
+}
+
+// H2H Types
+export interface H2HMatch {
+    match_id: number;
+    match_date: string;
+    winner_key: number;
+    tournament_name: string;
+    surface: string;
+    final_result: string;
+}
+
+export interface SurfaceH2HStats {
+    total: number;
+    player1_wins: number;
+    player2_wins: number;
+}
+
+export interface RecentForm {
+    date: string;
+    tournament: string;
+    surface: string;
+    opponent: string;
+    result: 'W' | 'L';
+    score: string;
+}
+
+export interface H2HData {
+    player1_key: number;
+    player2_key: number;
+    total_matches: number;
+    player1_wins: number;
+    player2_wins: number;
+    last_matches: H2HMatch[];
+    by_surface: Record<string, SurfaceH2HStats>;
+}
+
+export interface H2HResponse {
+    h2h: H2HData;
+    player1_recent_form: RecentForm[];
+    player2_recent_form: RecentForm[];
+}
+
+// Rankings Types
+export interface RankingsResponse {
+    league: 'ATP' | 'WTA';
+    total: number;
+    players: Player[];
+}
+
+// Tournament Types
+export interface Tournament {
+    tournament_key: number;
+    tournament_name: string;
+    event_type_key: number;
+    event_type_type: string;
+    created_at: string;
+}
+
+export interface TournamentsResponse {
+    total: number;
+    tournaments: Tournament[];
+}
+
+export interface TournamentMatchesResponse {
+    tournament_key: number;
+    season: number | null;
+    total_matches: number;
+    matches: Match[];
+}
+
+// Multi-Bookmaker Odds Types
+export interface BookmakerOdds {
+    bookmaker: string;
+    player1_odds: number;
+    player2_odds: number;
+    last_updated: string;
+}
+
+export interface MultiOddsResponse {
+    match_id: number;
+    total_bookmakers: number;
+    bookmakers: BookmakerOdds[];
+}
+
+export interface BestOddsResponse {
+    match_id: number;
+    player1_best: {
+        bookmaker: string;
+        odds: number;
+    };
+    player2_best: {
+        bookmaker: string;
+        odds: number;
+    };
+}
+
+export interface OddsComparisonResponse {
+    match_id: number;
+    comparison: {
+        bookmaker: string;
+        player1_odds: number;
+        player2_odds: number;
+        player1_ev: number;
+        player2_ev: number;
+    }[];
+}
+
+// Point-by-Point Enhanced Types
+export interface BreakPointsResponse {
+    match_id: number;
+    player1_break_points: {
+        opportunities: number;
+        converted: number;
+        conversion_rate: number;
+    };
+    player2_break_points: {
+        opportunities: number;
+        converted: number;
+        conversion_rate: number;
+    };
+}
+
+// ============================================
+// STATISTICS TYPES (New Backend Endpoints)
+// ============================================
+
+// Stats Summary Response
+export interface StatsSummaryResponse {
+    match_id: number;
+    has_data: boolean;
+    summary: {
+        total_games: number;
+        total_points: number;
+        player1: PlayerStatsData;
+        player2: PlayerStatsData;
+    };
+}
+
+export interface PlayerStatsData {
+    games_won: number;
+    breaks: number;
+    break_points_faced: number;
+    break_points_won: number;
+    serve_points: number;
+    break_conversion: string;
+}
+
+// Detailed Stats Response
+export interface DetailedStatsResponse {
+    match_id: number;
+    summary: {
+        total_games: number;
+        total_points: number;
+        breaks_player1: number;
+        breaks_player2: number;
+        total_sets: number;
+    };
+    sets: Record<string, SetData>;
+    break_points: BreakPointsData;
+    has_data: boolean;
+}
+
+export interface SetData {
+    games: GameData[];
+    games_player1: number;
+    games_player2: number;
+}
+
+export interface Player {
+    nombre: string;
+    cuota: number;
+    logo: string;
+    ranking: number | null;
+    key: string;
+    pais?: string;        // Country code (ISO 3166-1 alpha-2 or alpha-3)
+    seed?: number;        // Tournament seed number
+}
+export interface GameData {
+    id: number;
+    match_id: number;
+    set_number: string;
+    game_number: number;
+    server: string;
+    winner: string;
+    score_games: string;
+    score_sets?: string;
+    was_break: number;
+}
+
+export interface BreakPointsData {
+    total_break_points: number;
+    breaks_converted: number;
+    conversion_rate: number;
+}
+
+// Point by Point Response
+export interface PointByPointResponse {
+    match_id: number;
+    set_number: string | null;
+    total_points: number;
+    points: PointData[];
+}
+
+export interface PointData {
+    id: number;
+    match_id: number;
+    set_number: string;
+    game_number: number;
+    point_number: number;
+    server: string;
+    score: string;
+    is_break_point: number;
+    is_set_point: number;
+    is_match_point: number;
+}
+
+// Games Response
+export interface GamesResponse {
+    match_id: number;
+    total_games: number;
+    games: GameData[];
+}
+
+// Break Points Response
+export interface BreakPointsResponse {
+    match_id: number;
+    break_points_stats: {
+        total_break_points: number;
+        breaks_converted: number;
+        conversion_rate: number;
+    };
 }

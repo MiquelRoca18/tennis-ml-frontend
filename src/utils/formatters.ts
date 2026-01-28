@@ -26,6 +26,40 @@ export const formatTime = (timeString: string | null): string => {
 };
 
 /**
+ * Format match time with date context
+ * @param fecha - Date in YYYY-MM-DD format
+ * @param hora - Time in HH:MM format
+ * @returns Formatted time with context (e.g., "Hoy 14:30", "Mañana 10:00")
+ */
+export const formatMatchTime = (fecha: string, hora: string | null): string => {
+    if (!hora) return 'Hora por confirmar';
+
+    // Remove seconds if present (14:30:00 -> 14:30)
+    const timeWithoutSeconds = hora.includes(':')
+        ? hora.split(':').slice(0, 2).join(':')
+        : hora;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const matchDate = new Date(fecha + 'T00:00:00');
+    matchDate.setHours(0, 0, 0, 0);
+
+    const diffTime = matchDate.getTime() - today.getTime();
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return `Hoy ${timeWithoutSeconds}`;
+    if (diffDays === 1) return `Mañana ${timeWithoutSeconds}`;
+    if (diffDays === -1) return `Ayer ${timeWithoutSeconds}`;
+
+    // For other days, show short date
+    const options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' };
+    const dateStr = matchDate.toLocaleDateString('es-ES', options);
+    return `${dateStr} ${timeWithoutSeconds}`;
+};
+
+
+/**
  * Format percentage with sign
  * @param value - Decimal value (e.g., 0.052 for 5.2%)
  * @returns Formatted percentage (e.g., "+5.2%" or "-2.7%")

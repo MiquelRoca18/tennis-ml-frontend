@@ -4,7 +4,7 @@ import {
     PredictMatchRequest,
     PredictMatchResponse,
     UpdateResultRequest,
-    UpdateResultResponse,
+    UpdateResultResponse
 } from '../../types/api';
 import apiClient from './apiClient';
 
@@ -83,6 +83,108 @@ export const fetchMatchHistory = async (
 ): Promise<MatchHistoryResponse> => {
     const response = await apiClient.get<MatchHistoryResponse>(
         `/matches/${matchId}/history`
+    );
+    return response.data;
+};
+
+/**
+ * Fetch match details (basic and advanced stats)
+ * @param matchId - Match ID
+ * @returns Promise with match details
+ */
+export const fetchMatchDetails = async (
+    matchId: number
+): Promise<any> => {
+    const response = await apiClient.get<any>(
+        `/matches/${matchId}/details`
+    );
+    return response.data;
+};
+
+/**
+ * Fetch match analysis (details + timeline + momentum + key points)
+ * @param matchId - Match ID
+ * @returns Promise with match analysis
+ */
+export const fetchMatchAnalysis = async (
+    matchId: number
+): Promise<any> => {
+    const response = await apiClient.get<any>(
+        `/matches/${matchId}/analysis`
+    );
+    return response.data;
+};
+
+/**
+ * Fetch match stats summary
+ * @param matchId - Match ID
+ * @returns Promise with stats summary
+ */
+export const fetchMatchStatsSummary = async (
+    matchId: number
+): Promise<any> => {
+    const response = await apiClient.get<any>(
+        `/matches/${matchId}/stats/summary`
+    );
+    return response.data;
+};
+
+/**
+ * Fetch match stats detailed
+ * @param matchId - Match ID
+ * @returns Promise with detailed stats
+ */
+export const fetchMatchStatsDetailed = async (
+    matchId: number
+): Promise<any> => {
+    const response = await apiClient.get<any>(
+        `/matches/${matchId}/stats/detailed`
+    );
+    return response.data;
+};
+
+/**
+ * Fetch break points stats
+ * @param matchId - Match ID
+ * @returns Promise with break points stats
+ */
+export const fetchBreakPointsStats = async (
+    matchId: number
+): Promise<any> => {
+    const response = await apiClient.get<any>(
+        `/matches/${matchId}/breakpoints`
+    );
+    return response.data;
+};
+
+/**
+ * Fetch match games (timeline)
+ * @param matchId - Match ID
+ * @returns Promise with games data
+ */
+export const fetchMatchGames = async (
+    matchId: number
+): Promise<any> => {
+    const response = await apiClient.get<any>(
+        `/matches/${matchId}/games`
+    );
+    return response.data;
+};
+
+/**
+ * Fetch point by point data
+ * @param matchId - Match ID
+ * @param setNumber - Optional set number filter
+ * @returns Promise with point by point data
+ */
+export const fetchPointByPoint = async (
+    matchId: number,
+    setNumber?: number
+): Promise<any> => {
+    const params = setNumber ? { set_number: setNumber } : {};
+    const response = await apiClient.get<any>(
+        `/matches/${matchId}/pointbypoint`,
+        { params }
     );
     return response.data;
 };

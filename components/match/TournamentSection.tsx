@@ -85,22 +85,26 @@ export default function TournamentSection({
     );
 }
 
+
 const styles = StyleSheet.create({
     container: {
-        marginBottom: 8,
-        backgroundColor: COLORS.surface,
-        borderRadius: 8,
-        overflow: 'hidden',
-        marginHorizontal: 8,
+        marginBottom: 24,
+        backgroundColor: 'transparent', // Let matches have their own cards or wrap them? 
+        // Guide shows "Matches" organized in cards. 
+        // If TournamentSection wraps matches, maybe the section header is just a title?
+        // But the current implementation is an accordion.
+        // Let's keep the accordion style but make it look cleaner.
+        marginHorizontal: 16,
     },
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: 12,
-        backgroundColor: COLORS.surface,
-        borderBottomWidth: 1,
-        borderBottomColor: COLORS.border,
+        paddingVertical: 12,
+        paddingHorizontal: 4,
+        // backgroundColor: COLORS.surface, // Remove background from header to make it float? Or keep it?
+        // Let's make the header stand out less as a box, more as a title.
+        marginBottom: 8,
     },
     headerLeft: {
         flexDirection: 'row',
@@ -117,34 +121,39 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     tournamentName: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '700',
         color: COLORS.textPrimary,
         marginBottom: 2,
     },
     surface: {
-        fontSize: 11,
+        fontSize: 12,
         color: COLORS.textSecondary,
+        textTransform: 'uppercase',
+        letterSpacing: 1,
     },
     headerRight: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
+        gap: 8,
     },
     badge: {
-        backgroundColor: COLORS.background,
-        paddingHorizontal: 8,
+        backgroundColor: COLORS.surface, // Background for badge
+        paddingHorizontal: 10,
         paddingVertical: 4,
         borderRadius: 12,
-        minWidth: 28,
+        minWidth: 32,
         alignItems: 'center',
+        borderWidth: 1,
+        borderColor: COLORS.border,
     },
     badgeLive: {
         backgroundColor: '#FF444410',
+        borderColor: '#FF444440',
     },
     badgeText: {
         fontSize: 11,
-        fontWeight: '600',
+        fontWeight: '700',
         color: '#FF4444',
     },
     badgeTextSecondary: {
@@ -153,6 +162,6 @@ const styles = StyleSheet.create({
         color: COLORS.textSecondary,
     },
     matchesContainer: {
-        backgroundColor: COLORS.background,
+        backgroundColor: 'transparent',
     },
 });

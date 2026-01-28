@@ -17,7 +17,9 @@ import { useMatchDetail } from '../../../../src/hooks/useMatchDetail';
 import { COLORS } from '../../../../src/utils/constants';
 import MatchHeroV2 from './MatchHeroV2';
 import H2HTabV2 from './tabs/H2HTabV2';
+import OddsTabV2 from './tabs/OddsTabV2';
 import OverviewTabV2 from './tabs/OverviewTabV2';
+import PredictionTabV2 from './tabs/PredictionTabV2';
 import StatsTabV2 from './tabs/StatsTabV2';
 import TimelineTabV2 from './tabs/TimelineTabV2';
 
@@ -91,7 +93,7 @@ export default function MatchDetailV2({ matchId }: MatchDetailV2Props) {
                 </View>
             )}
 
-            {/* Tabs */}
+            {/* Tabs - Diferentes según estado del partido */}
             <Tab.Navigator
                 screenOptions={{
                     tabBarScrollEnabled: true,
@@ -104,6 +106,7 @@ export default function MatchDetailV2({ matchId }: MatchDetailV2Props) {
                     swipeEnabled: true,
                 }}
             >
+                {/* Overview - siempre visible */}
                 <Tab.Screen 
                     name="Overview" 
                     options={{ tabBarLabel: 'RESUMEN' }}
@@ -111,7 +114,26 @@ export default function MatchDetailV2({ matchId }: MatchDetailV2Props) {
                     {() => <OverviewTabV2 data={data} />}
                 </Tab.Screen>
 
-                {/* Stats - solo para partidos terminados/en juego */}
+                {/* ===== TABS PARA PARTIDOS PENDIENTES ===== */}
+                {isPending && (
+                    <Tab.Screen 
+                        name="Prediction" 
+                        options={{ tabBarLabel: 'PREDICCIÓN' }}
+                    >
+                        {() => <PredictionTabV2 data={data} />}
+                    </Tab.Screen>
+                )}
+
+                {isPending && (
+                    <Tab.Screen 
+                        name="Odds" 
+                        options={{ tabBarLabel: 'CUOTAS' }}
+                    >
+                        {() => <OddsTabV2 data={data} />}
+                    </Tab.Screen>
+                )}
+
+                {/* ===== TABS PARA PARTIDOS EN JUEGO/COMPLETADOS ===== */}
                 {!isPending && (
                     <Tab.Screen 
                         name="Stats" 
@@ -121,7 +143,6 @@ export default function MatchDetailV2({ matchId }: MatchDetailV2Props) {
                     </Tab.Screen>
                 )}
 
-                {/* Timeline - solo para partidos terminados/en juego */}
                 {!isPending && (
                     <Tab.Screen 
                         name="Timeline" 

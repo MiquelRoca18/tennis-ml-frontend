@@ -140,8 +140,8 @@ export default function MatchHeroV2({ data }: MatchHeroV2Props) {
                 </View>
             </View>
 
-            {/* Set Scores */}
-            {sets.length > 0 && (
+            {/* Set Scores - Solo si el partido ha empezado */}
+            {!isPending && sets.length > 0 && (
                 <View style={styles.setsSection}>
                     {sets.map((set, idx) => (
                         <SetScoreBox 

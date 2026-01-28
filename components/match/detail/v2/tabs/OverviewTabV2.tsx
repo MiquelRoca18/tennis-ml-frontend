@@ -10,7 +10,7 @@
 
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { MatchFullResponse, MatchOdds, getShortName, safePercentage } from '../../../../../src/types/matchDetail';
+import { MatchFullResponse, getShortName, safePercentage } from '../../../../../src/types/matchDetail';
 import { COLORS } from '../../../../../src/utils/constants';
 
 interface OverviewTabV2Props {
@@ -18,7 +18,7 @@ interface OverviewTabV2Props {
 }
 
 export default function OverviewTabV2({ data }: OverviewTabV2Props) {
-    const { match, player1, player2, scores, stats, prediction, odds } = data;
+    const { match, player1, player2, stats, prediction } = data;
     const p1Short = getShortName(player1.name);
     const p2Short = getShortName(player2.name);
     const isPending = match.status === 'pendiente';
@@ -29,20 +29,11 @@ export default function OverviewTabV2({ data }: OverviewTabV2Props) {
             contentContainerStyle={styles.content}
             showsVerticalScrollIndicator={false}
         >
-            {/* Match Info Card */}
+            {/* Match Info Card - Solo info básica */}
             <MatchInfoCard data={data} />
 
-            {/* Cuotas para partidos pendientes */}
-            {isPending && odds && (
-                <OddsCard 
-                    odds={odds}
-                    p1Name={p1Short}
-                    p2Name={p2Short}
-                />
-            )}
-
-            {/* Key Stats (solo si hay datos) */}
-            {stats && stats.has_detailed_stats && (
+            {/* Key Stats (solo si hay datos - partidos no pendientes) */}
+            {!isPending && stats && stats.has_detailed_stats && (
                 <KeyStatsCard 
                     stats={stats} 
                     p1Name={p1Short} 
@@ -50,8 +41,8 @@ export default function OverviewTabV2({ data }: OverviewTabV2Props) {
                 />
             )}
 
-            {/* Prediction Preview */}
-            {prediction && (
+            {/* Prediction Preview (solo para partidos no pendientes) */}
+            {!isPending && prediction && (
                 <PredictionPreview 
                     prediction={prediction}
                     p1Name={p1Short}
@@ -60,12 +51,12 @@ export default function OverviewTabV2({ data }: OverviewTabV2Props) {
             )}
 
             {/* Info para partidos pendientes */}
-            {isPending && !prediction && !odds && (
+            {isPending && (
                 <View style={styles.emptyCard}>
                     <Text style={styles.emptyIcon}>🎾</Text>
                     <Text style={styles.emptyTitle}>Partido Programado</Text>
                     <Text style={styles.emptyText}>
-                        La predicción y cuotas estarán disponibles próximamente.
+                        Consulta los tabs de Predicción y Cuotas para más información.
                     </Text>
                 </View>
             )}
@@ -78,7 +69,7 @@ export default function OverviewTabV2({ data }: OverviewTabV2Props) {
 // ============================================================
 
 function MatchInfoCard({ data }: { data: MatchFullResponse }) {
-    const { match, odds } = data;
+    const { match } = data;
 
     const formatDate = (dateStr: string) => {
         const date = new Date(dateStr);
@@ -96,27 +87,8 @@ function MatchInfoCard({ data }: { data: MatchFullResponse }) {
             <View style={styles.infoGrid}>
                 <InfoRow label="Fecha" value={formatDate(match.date)} />
                 {match.time && <InfoRow label="Hora" value={match.time.slice(0, 5)} />}
-                <InfoRow label="Superficie" value={match.surface} />
                 {match.round && <InfoRow label="Ronda" value={match.round} />}
-                
-                {odds && (
-                    <>
-                        {odds.best_odds_player1 && (
-                            <InfoRow 
-                                label="Cuota J1" 
-                                value={odds.best_odds_player1.toFixed(2)} 
-                                highlight 
-                            />
-                        )}
-                        {odds.best_odds_player2 && (
-                            <InfoRow 
-                                label="Cuota J2" 
-                                value={odds.best_odds_player2.toFixed(2)} 
-                                highlight 
-                            />
-                        )}
-                    </>
-                )}
+                <InfoRow label="Superficie" value={match.surface} />
             </View>
         </View>
     );
@@ -127,68 +99,6 @@ function InfoRow({ label, value, highlight }: { label: string; value: string; hi
         <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>{label}</Text>
             <Text style={[styles.infoValue, highlight && styles.infoValueHighlight]}>{value}</Text>
-        </View>
-    );
-}
-
-// ============================================================
-// ODDS CARD (para partidos pendientes)
-// ============================================================
-
-function OddsCard({ odds, p1Name, p2Name }: {
-    odds: MatchOdds;
-    p1Name: string;
-    p2Name: string;
-}) {
-    const favorito = odds.market_consensus;
-    
-    return (
-        <View style={styles.card}>
-            <Text style={styles.cardTitle}>💰 Cuotas</Text>
-            
-            <View style={styles.oddsContainer}>
-                {/* Player 1 Odds */}
-                <View style={[
-                    styles.oddsBox,
-                    favorito === 1 && styles.oddsBoxFavorite
-                ]}>
-                    <Text style={styles.oddsPlayer}>{p1Name}</Text>
-                    <Text style={[
-                        styles.oddsValue,
-                        favorito === 1 && styles.oddsValueFavorite
-                    ]}>
-                        {odds.best_odds_player1?.toFixed(2) || '-'}
-                    </Text>
-                    {favorito === 1 && (
-                        <Text style={styles.favoriteLabel}>FAVORITO</Text>
-                    )}
-                </View>
-
-                <Text style={styles.oddsVs}>VS</Text>
-
-                {/* Player 2 Odds */}
-                <View style={[
-                    styles.oddsBox,
-                    favorito === 2 && styles.oddsBoxFavorite
-                ]}>
-                    <Text style={styles.oddsPlayer}>{p2Name}</Text>
-                    <Text style={[
-                        styles.oddsValue,
-                        favorito === 2 && styles.oddsValueFavorite
-                    ]}>
-                        {odds.best_odds_player2?.toFixed(2) || '-'}
-                    </Text>
-                    {favorito === 2 && (
-                        <Text style={styles.favoriteLabel}>FAVORITO</Text>
-                    )}
-                </View>
-            </View>
-
-            {odds.bookmakers.length > 0 && (
-                <Text style={styles.oddsSource}>
-                    Fuente: {odds.bookmakers[0].bookmaker}
-                </Text>
-            )}
         </View>
     );
 }

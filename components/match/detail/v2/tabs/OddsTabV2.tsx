@@ -2,14 +2,13 @@
  * OddsTabV2 - Tab de Cuotas de Casas de Apuestas
  * ===============================================
  * 
- * Muestra las cuotas de diferentes bookmakers para partidos pendientes:
- * - Comparación de cuotas
- * - Favorito del mercado
- * - Mejores cuotas disponibles
+ * Muestra las cuotas de diferentes bookmakers ordenadas de mejor a peor.
+ * Obtiene las cuotas directamente de la API Tennis.
  */
 
-import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { fetchMatchOddsDetailed, DetailedOddsResponse } from '../../../../../src/services/api/matchDetailService';
 import { MatchFullResponse, getShortName } from '../../../../../src/types/matchDetail';
 import { COLORS } from '../../../../../src/utils/constants';
 
@@ -18,12 +17,55 @@ interface OddsTabV2Props {
 }
 
 export default function OddsTabV2({ data }: OddsTabV2Props) {
-    const { odds, player1, player2, prediction } = data;
+    const [oddsData, setOddsData] = useState<DetailedOddsResponse | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
+    const { player1, player2 } = data;
     const p1Short = getShortName(player1.name);
     const p2Short = getShortName(player2.name);
 
-    if (!odds || (!odds.best_odds_player1 && !odds.best_odds_player2)) {
+    useEffect(() => {
+        loadOdds();
+    }, [data.match.id]);
+
+    const loadOdds = async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            const result = await fetchMatchOddsDetailed(data.match.id);
+            setOddsData(result);
+        } catch (err) {
+            setError('Error al cargar las cuotas');
+            console.error('Error loading odds:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Loading
+    if (loading) {
+        return (
+            <View style={styles.centerContainer}>
+                <ActivityIndicator size="large" color={COLORS.primary} />
+                <Text style={styles.loadingText}>Cargando cuotas...</Text>
+            </View>
+        );
+    }
+
+    // Error
+    if (error) {
+        return (
+            <View style={styles.emptyContainer}>
+                <Text style={styles.emptyIcon}>⚠️</Text>
+                <Text style={styles.emptyTitle}>Error</Text>
+                <Text style={styles.emptyText}>{error}</Text>
+            </View>
+        );
+    }
+
+    // No odds
+    if (!oddsData || oddsData.bookmakers.length === 0) {
         return (
             <View style={styles.emptyContainer}>
                 <Text style={styles.emptyIcon}>💰</Text>
@@ -35,20 +77,9 @@ export default function OddsTabV2({ data }: OddsTabV2Props) {
         );
     }
 
-    const p1Odds = odds.best_odds_player1 || 0;
-    const p2Odds = odds.best_odds_player2 || 0;
-    
-    // Calcular probabilidades implícitas
-    const p1ImpliedProb = p1Odds > 0 ? (1 / p1Odds * 100) : 0;
-    const p2ImpliedProb = p2Odds > 0 ? (1 / p2Odds * 100) : 0;
-    
-    // Determinar favorito
-    const favorite = p1Odds < p2Odds ? 1 : p1Odds > p2Odds ? 2 : 0;
-    const favoriteName = favorite === 1 ? p1Short : p2Short;
-    const favoriteOdds = favorite === 1 ? p1Odds : p2Odds;
-    
-    // Calcular margen de la casa (overround)
-    const margin = p1ImpliedProb + p2ImpliedProb - 100;
+    const bookmakers = oddsData.bookmakers;
+    const bestP1 = oddsData.best_odds_player1;
+    const bestP2 = oddsData.best_odds_player2;
 
     return (
         <ScrollView 
@@ -56,209 +87,104 @@ export default function OddsTabV2({ data }: OddsTabV2Props) {
             contentContainerStyle={styles.content}
             showsVerticalScrollIndicator={false}
         >
-            {/* Market Favorite Card */}
-            {favorite !== 0 && (
-                <View style={styles.favoriteCard}>
-                    <Text style={styles.favoriteLabel}>FAVORITO DEL MERCADO</Text>
-                    <Text style={styles.favoriteName}>{favoriteName}</Text>
-                    <View style={styles.favoriteOddsContainer}>
-                        <Text style={styles.favoriteOdds}>@{favoriteOdds.toFixed(2)}</Text>
-                    </View>
-                </View>
-            )}
-
-            {/* Main Odds Comparison */}
-            <View style={styles.oddsCard}>
-                <View style={styles.cardHeader}>
-                    <Text style={styles.cardHeaderIcon}>📊</Text>
-                    <Text style={styles.cardHeaderTitle}>Comparación de Cuotas</Text>
-                </View>
-
-                {/* Player 1 */}
-                <View style={styles.playerOddsRow}>
-                    <View style={styles.playerInfo}>
-                        <View style={[styles.playerDot, styles.playerDotP1]} />
-                        <Text style={styles.playerName}>{player1.name}</Text>
-                    </View>
-                    <View style={styles.oddsInfo}>
-                        <Text style={[styles.oddsValue, favorite === 1 && styles.oddsValueFavorite]}>
-                            {p1Odds.toFixed(2)}
-                        </Text>
-                        <Text style={styles.impliedProb}>
-                            {p1ImpliedProb.toFixed(0)}% impl.
+            {/* Header con mejores cuotas */}
+            <View style={styles.bestOddsCard}>
+                <Text style={styles.bestOddsTitle}>🏆 Mejores Cuotas Disponibles</Text>
+                
+                <View style={styles.bestOddsRow}>
+                    <View style={styles.bestOddsPlayer}>
+                        <Text style={styles.bestOddsName}>{p1Short}</Text>
+                        <Text style={styles.bestOddsValue}>
+                            {bestP1 ? bestP1.toFixed(2) : '-'}
                         </Text>
                     </View>
-                </View>
-
-                {/* Divider */}
-                <View style={styles.divider} />
-
-                {/* Player 2 */}
-                <View style={styles.playerOddsRow}>
-                    <View style={styles.playerInfo}>
-                        <View style={[styles.playerDot, styles.playerDotP2]} />
-                        <Text style={styles.playerName}>{player2.name}</Text>
+                    
+                    <View style={styles.bestOddsDivider}>
+                        <Text style={styles.vsText}>VS</Text>
                     </View>
-                    <View style={styles.oddsInfo}>
-                        <Text style={[styles.oddsValue, favorite === 2 && styles.oddsValueFavorite]}>
-                            {p2Odds.toFixed(2)}
-                        </Text>
-                        <Text style={styles.impliedProb}>
-                            {p2ImpliedProb.toFixed(0)}% impl.
+                    
+                    <View style={styles.bestOddsPlayer}>
+                        <Text style={styles.bestOddsName}>{p2Short}</Text>
+                        <Text style={styles.bestOddsValue}>
+                            {bestP2 ? bestP2.toFixed(2) : '-'}
                         </Text>
                     </View>
                 </View>
             </View>
 
-            {/* Visual Comparison */}
-            <View style={styles.visualCard}>
-                <Text style={styles.visualTitle}>Probabilidad Implícita</Text>
-                <View style={styles.visualBar}>
-                    <View style={[styles.visualBarP1, { flex: p1ImpliedProb }]}>
-                        <Text style={styles.visualBarText}>{p1Short}</Text>
-                    </View>
-                    <View style={[styles.visualBarP2, { flex: p2ImpliedProb }]}>
-                        <Text style={styles.visualBarText}>{p2Short}</Text>
-                    </View>
-                </View>
-                <View style={styles.visualValues}>
-                    <Text style={[styles.visualValue, styles.visualValueP1]}>
-                        {p1ImpliedProb.toFixed(1)}%
+            {/* Lista de bookmakers */}
+            <View style={styles.bookmakersCard}>
+                <View style={styles.bookmakersHeader}>
+                    <Text style={styles.bookmakersTitle}>
+                        📊 Comparación de Cuotas ({bookmakers.length} casas)
                     </Text>
-                    <Text style={[styles.visualValue, styles.visualValueP2]}>
-                        {p2ImpliedProb.toFixed(1)}%
+                    <Text style={styles.bookmakersSubtitle}>
+                        Ordenadas de mejor a peor
                     </Text>
                 </View>
-            </View>
 
-            {/* Model vs Market Comparison */}
-            {prediction && (
-                <View style={styles.comparisonCard}>
-                    <View style={styles.cardHeader}>
-                        <Text style={styles.cardHeaderIcon}>🤖 vs 💰</Text>
-                        <Text style={styles.cardHeaderTitle}>Modelo vs Mercado</Text>
-                    </View>
-
-                    <View style={styles.comparisonGrid}>
-                        {/* Player 1 */}
-                        <View style={styles.comparisonRow}>
-                            <Text style={styles.comparisonPlayer}>{p1Short}</Text>
-                            <View style={styles.comparisonValues}>
-                                <View style={styles.comparisonItem}>
-                                    <Text style={styles.comparisonLabel}>Modelo</Text>
-                                    <Text style={[styles.comparisonValue, styles.comparisonModel]}>
-                                        {prediction.probability_player1.toFixed(0)}%
-                                    </Text>
-                                </View>
-                                <View style={styles.comparisonItem}>
-                                    <Text style={styles.comparisonLabel}>Mercado</Text>
-                                    <Text style={[styles.comparisonValue, styles.comparisonMarket]}>
-                                        {p1ImpliedProb.toFixed(0)}%
-                                    </Text>
-                                </View>
-                                <View style={styles.comparisonItem}>
-                                    <Text style={styles.comparisonLabel}>Diff</Text>
-                                    <Text style={[
-                                        styles.comparisonValue,
-                                        styles.comparisonDiff,
-                                        { color: prediction.probability_player1 > p1ImpliedProb 
-                                            ? COLORS.success 
-                                            : COLORS.danger }
-                                    ]}>
-                                        {(prediction.probability_player1 - p1ImpliedProb) > 0 ? '+' : ''}
-                                        {(prediction.probability_player1 - p1ImpliedProb).toFixed(0)}%
-                                    </Text>
-                                </View>
-                            </View>
-                        </View>
-
-                        {/* Player 2 */}
-                        <View style={[styles.comparisonRow, styles.comparisonRowLast]}>
-                            <Text style={styles.comparisonPlayer}>{p2Short}</Text>
-                            <View style={styles.comparisonValues}>
-                                <View style={styles.comparisonItem}>
-                                    <Text style={styles.comparisonLabel}>Modelo</Text>
-                                    <Text style={[styles.comparisonValue, styles.comparisonModel]}>
-                                        {prediction.probability_player2.toFixed(0)}%
-                                    </Text>
-                                </View>
-                                <View style={styles.comparisonItem}>
-                                    <Text style={styles.comparisonLabel}>Mercado</Text>
-                                    <Text style={[styles.comparisonValue, styles.comparisonMarket]}>
-                                        {p2ImpliedProb.toFixed(0)}%
-                                    </Text>
-                                </View>
-                                <View style={styles.comparisonItem}>
-                                    <Text style={styles.comparisonLabel}>Diff</Text>
-                                    <Text style={[
-                                        styles.comparisonValue,
-                                        styles.comparisonDiff,
-                                        { color: prediction.probability_player2 > p2ImpliedProb 
-                                            ? COLORS.success 
-                                            : COLORS.danger }
-                                    ]}>
-                                        {(prediction.probability_player2 - p2ImpliedProb) > 0 ? '+' : ''}
-                                        {(prediction.probability_player2 - p2ImpliedProb).toFixed(0)}%
-                                    </Text>
-                                </View>
-                            </View>
-                        </View>
-                    </View>
-
-                    <Text style={styles.comparisonHint}>
-                        Diferencia positiva = el modelo cree que hay más probabilidad que el mercado
+                {/* Table Header */}
+                <View style={styles.tableHeader}>
+                    <Text style={[styles.tableHeaderText, styles.tableColBookmaker]}>
+                        Casa de Apuestas
+                    </Text>
+                    <Text style={[styles.tableHeaderText, styles.tableColOdds]}>
+                        {p1Short}
+                    </Text>
+                    <Text style={[styles.tableHeaderText, styles.tableColOdds]}>
+                        {p2Short}
                     </Text>
                 </View>
-            )}
 
-            {/* Bookmakers List */}
-            {odds.bookmakers && odds.bookmakers.length > 0 && (
-                <View style={styles.bookmakersCard}>
-                    <View style={styles.cardHeader}>
-                        <Text style={styles.cardHeaderIcon}>🏢</Text>
-                        <Text style={styles.cardHeaderTitle}>Casas de Apuestas</Text>
-                    </View>
-
-                    {/* Header */}
-                    <View style={styles.bookmakerHeader}>
-                        <Text style={styles.bookmakerHeaderText}>Casa</Text>
-                        <Text style={styles.bookmakerHeaderText}>{p1Short}</Text>
-                        <Text style={styles.bookmakerHeaderText}>{p2Short}</Text>
-                    </View>
-
-                    {/* Rows */}
-                    {odds.bookmakers.map((bm, index) => (
+                {/* Bookmaker Rows */}
+                {bookmakers.map((bm, index) => {
+                    const isP1Best = bm.player1_odds === bestP1 && bm.player1_odds !== null;
+                    const isP2Best = bm.player2_odds === bestP2 && bm.player2_odds !== null;
+                    
+                    return (
                         <View 
-                            key={bm.bookmaker + index} 
+                            key={bm.bookmaker + index}
                             style={[
-                                styles.bookmakerRow,
-                                index === odds.bookmakers.length - 1 && styles.bookmakerRowLast
+                                styles.tableRow,
+                                index === bookmakers.length - 1 && styles.tableRowLast,
+                                index === 0 && styles.tableRowFirst
                             ]}
                         >
-                            <Text style={styles.bookmakerName}>{bm.bookmaker}</Text>
-                            <Text style={styles.bookmakerOdds}>
-                                {bm.player1_odds.toFixed(2)}
-                            </Text>
-                            <Text style={styles.bookmakerOdds}>
-                                {bm.player2_odds.toFixed(2)}
-                            </Text>
+                            <View style={styles.tableColBookmaker}>
+                                <Text style={styles.bookmakerName}>{bm.bookmaker}</Text>
+                                {index === 0 && (
+                                    <View style={styles.bestBadge}>
+                                        <Text style={styles.bestBadgeText}>TOP</Text>
+                                    </View>
+                                )}
+                            </View>
+                            <View style={styles.tableColOdds}>
+                                <Text style={[
+                                    styles.oddsValue,
+                                    isP1Best && styles.oddsValueBest
+                                ]}>
+                                    {bm.player1_odds ? bm.player1_odds.toFixed(2) : '-'}
+                                </Text>
+                            </View>
+                            <View style={styles.tableColOdds}>
+                                <Text style={[
+                                    styles.oddsValue,
+                                    isP2Best && styles.oddsValueBest
+                                ]}>
+                                    {bm.player2_odds ? bm.player2_odds.toFixed(2) : '-'}
+                                </Text>
+                            </View>
                         </View>
-                    ))}
-                </View>
-            )}
+                    );
+                })}
+            </View>
 
             {/* Info */}
             <View style={styles.infoCard}>
-                <Text style={styles.infoTitle}>Sobre las cuotas</Text>
                 <Text style={styles.infoText}>
-                    Las cuotas muestran las probabilidades implícitas según el mercado. 
-                    Cuotas más bajas = mayor probabilidad de ganar según las casas de apuestas.
+                    💡 Las cuotas más altas representan mayor potencial de ganancia. 
+                    Busca siempre la mejor cuota antes de apostar.
                 </Text>
-                {margin > 0 && (
-                    <Text style={styles.marginText}>
-                        Margen de la casa: {margin.toFixed(1)}%
-                    </Text>
-                )}
             </View>
         </ScrollView>
     );
@@ -273,6 +199,18 @@ const styles = StyleSheet.create({
         padding: 16,
         paddingBottom: 32,
         gap: 16,
+    },
+    centerContainer: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 40,
+        backgroundColor: COLORS.background,
+    },
+    loadingText: {
+        marginTop: 12,
+        fontSize: 14,
+        color: COLORS.textSecondary,
     },
 
     // Empty State
@@ -300,227 +238,47 @@ const styles = StyleSheet.create({
         lineHeight: 20,
     },
 
-    // Favorite Card
-    favoriteCard: {
+    // Best Odds Card
+    bestOddsCard: {
         backgroundColor: COLORS.primary + '15',
         borderRadius: 16,
         padding: 20,
-        alignItems: 'center',
         borderWidth: 1,
         borderColor: COLORS.primary + '30',
     },
-    favoriteLabel: {
-        fontSize: 11,
-        fontWeight: '600',
-        color: COLORS.textSecondary,
-        letterSpacing: 1,
-        marginBottom: 4,
-    },
-    favoriteName: {
-        fontSize: 22,
-        fontWeight: '800',
-        color: COLORS.primary,
-        marginBottom: 8,
-    },
-    favoriteOddsContainer: {
-        backgroundColor: COLORS.primary,
-        paddingHorizontal: 20,
-        paddingVertical: 8,
-        borderRadius: 20,
-    },
-    favoriteOdds: {
-        fontSize: 18,
-        fontWeight: '800',
-        color: '#FFF',
-    },
-
-    // Card Common
-    cardHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        marginBottom: 16,
-    },
-    cardHeaderIcon: {
-        fontSize: 18,
-    },
-    cardHeaderTitle: {
+    bestOddsTitle: {
         fontSize: 16,
         fontWeight: '700',
-        color: COLORS.textPrimary,
+        color: COLORS.primary,
+        textAlign: 'center',
+        marginBottom: 16,
     },
-
-    // Odds Card
-    oddsCard: {
-        backgroundColor: COLORS.surface,
-        borderRadius: 16,
-        padding: 16,
-        borderWidth: 1,
-        borderColor: COLORS.border,
-    },
-    playerOddsRow: {
+    bestOddsRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingVertical: 12,
     },
-    playerInfo: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 10,
+    bestOddsPlayer: {
         flex: 1,
+        alignItems: 'center',
     },
-    playerDot: {
-        width: 12,
-        height: 12,
-        borderRadius: 6,
-    },
-    playerDotP1: {
-        backgroundColor: COLORS.primary,
-    },
-    playerDotP2: {
-        backgroundColor: COLORS.success,
-    },
-    playerName: {
-        fontSize: 15,
+    bestOddsName: {
+        fontSize: 14,
         fontWeight: '600',
-        color: COLORS.textPrimary,
-        flex: 1,
+        color: COLORS.textSecondary,
+        marginBottom: 8,
     },
-    oddsInfo: {
-        alignItems: 'flex-end',
-    },
-    oddsValue: {
-        fontSize: 20,
+    bestOddsValue: {
+        fontSize: 32,
         fontWeight: '800',
-        color: COLORS.textPrimary,
-    },
-    oddsValueFavorite: {
         color: COLORS.primary,
     },
-    impliedProb: {
-        fontSize: 11,
-        fontWeight: '500',
-        color: COLORS.textSecondary,
+    bestOddsDivider: {
+        paddingHorizontal: 16,
     },
-    divider: {
-        height: 1,
-        backgroundColor: COLORS.border,
-    },
-
-    // Visual Card
-    visualCard: {
-        backgroundColor: COLORS.surface,
-        borderRadius: 16,
-        padding: 16,
-        borderWidth: 1,
-        borderColor: COLORS.border,
-    },
-    visualTitle: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: COLORS.textSecondary,
-        marginBottom: 12,
-        textAlign: 'center',
-    },
-    visualBar: {
-        flexDirection: 'row',
-        height: 40,
-        borderRadius: 8,
-        overflow: 'hidden',
-        gap: 2,
-    },
-    visualBarP1: {
-        backgroundColor: COLORS.primary,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    visualBarP2: {
-        backgroundColor: COLORS.success,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    visualBarText: {
-        fontSize: 12,
+    vsText: {
+        fontSize: 16,
         fontWeight: '700',
-        color: '#FFF',
-    },
-    visualValues: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginTop: 8,
-    },
-    visualValue: {
-        fontSize: 14,
-        fontWeight: '700',
-    },
-    visualValueP1: {
-        color: COLORS.primary,
-    },
-    visualValueP2: {
-        color: COLORS.success,
-    },
-
-    // Comparison Card
-    comparisonCard: {
-        backgroundColor: COLORS.surface,
-        borderRadius: 16,
-        padding: 16,
-        borderWidth: 1,
-        borderColor: COLORS.border,
-    },
-    comparisonGrid: {
-        gap: 0,
-    },
-    comparisonRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: COLORS.border,
-    },
-    comparisonRowLast: {
-        borderBottomWidth: 0,
-    },
-    comparisonPlayer: {
-        fontSize: 14,
-        fontWeight: '700',
-        color: COLORS.textPrimary,
-        width: 80,
-    },
-    comparisonValues: {
-        flex: 1,
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-    },
-    comparisonItem: {
-        alignItems: 'center',
-    },
-    comparisonLabel: {
-        fontSize: 10,
-        fontWeight: '500',
         color: COLORS.textSecondary,
-        marginBottom: 4,
-    },
-    comparisonValue: {
-        fontSize: 15,
-        fontWeight: '700',
-    },
-    comparisonModel: {
-        color: COLORS.primary,
-    },
-    comparisonMarket: {
-        color: COLORS.textPrimary,
-    },
-    comparisonDiff: {
-        // Color set dynamically
-    },
-    comparisonHint: {
-        fontSize: 11,
-        color: COLORS.textSecondary,
-        textAlign: 'center',
-        marginTop: 12,
-        fontStyle: 'italic',
     },
 
     // Bookmakers Card
@@ -531,40 +289,88 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: COLORS.border,
     },
-    bookmakerHeader: {
-        flexDirection: 'row',
-        paddingBottom: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: COLORS.border,
+    bookmakersHeader: {
+        marginBottom: 16,
     },
-    bookmakerHeaderText: {
-        flex: 1,
+    bookmakersTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: COLORS.textPrimary,
+    },
+    bookmakersSubtitle: {
         fontSize: 12,
-        fontWeight: '600',
         color: COLORS.textSecondary,
-        textAlign: 'center',
+        marginTop: 4,
     },
-    bookmakerRow: {
+
+    // Table
+    tableHeader: {
         flexDirection: 'row',
         paddingVertical: 12,
+        borderBottomWidth: 2,
+        borderBottomColor: COLORS.border,
+        backgroundColor: COLORS.background,
+        borderRadius: 8,
+        marginBottom: 4,
+    },
+    tableHeaderText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: COLORS.textSecondary,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    tableColBookmaker: {
+        flex: 2,
+        paddingLeft: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    tableColOdds: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    tableRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 14,
         borderBottomWidth: 1,
         borderBottomColor: COLORS.border,
     },
-    bookmakerRowLast: {
+    tableRowLast: {
         borderBottomWidth: 0,
     },
+    tableRowFirst: {
+        backgroundColor: COLORS.success + '10',
+        borderRadius: 8,
+        marginHorizontal: -8,
+        paddingHorizontal: 8,
+    },
     bookmakerName: {
-        flex: 1,
         fontSize: 14,
         fontWeight: '600',
         color: COLORS.textPrimary,
     },
-    bookmakerOdds: {
-        flex: 1,
-        fontSize: 15,
+    bestBadge: {
+        backgroundColor: COLORS.success,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+    },
+    bestBadgeText: {
+        fontSize: 9,
+        fontWeight: '700',
+        color: '#FFF',
+    },
+    oddsValue: {
+        fontSize: 16,
         fontWeight: '700',
         color: COLORS.textPrimary,
-        textAlign: 'center',
+    },
+    oddsValueBest: {
+        color: COLORS.success,
+        fontWeight: '800',
     },
 
     // Info Card
@@ -575,21 +381,9 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: COLORS.border,
     },
-    infoTitle: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: COLORS.textSecondary,
-        marginBottom: 8,
-    },
     infoText: {
-        fontSize: 12,
+        fontSize: 13,
         color: COLORS.textSecondary,
-        lineHeight: 18,
-    },
-    marginText: {
-        fontSize: 12,
-        color: COLORS.warning,
-        marginTop: 8,
-        fontWeight: '500',
+        lineHeight: 20,
     },
 });

@@ -4,7 +4,7 @@ import { API_BASE_URL } from '../../utils/constants';
 // Create axios instance with default config
 const apiClient: AxiosInstance = axios.create({
     baseURL: API_BASE_URL,
-    timeout: 10000,
+    timeout: 30000, // 30 segundos para permitir cold starts
     headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
@@ -38,6 +38,11 @@ apiClient.interceptors.response.use(
         // Handle errors globally
         if (__DEV__) {
             console.error('[API Error]', error.message);
+        }
+
+        // Timeout error
+        if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+            throw new Error('El servidor está tardando. Intenta de nuevo.');
         }
 
         // Network error

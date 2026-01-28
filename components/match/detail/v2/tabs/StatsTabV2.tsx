@@ -12,7 +12,7 @@
 
 import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { MatchFullResponse, MatchStats, getShortName, safePercentage } from '../../../../../src/types/matchDetail';
+import { MatchFullResponse, MatchStats, getShortName } from '../../../../../src/types/matchDetail';
 import { COLORS } from '../../../../../src/utils/constants';
 
 interface StatsTabV2Props {
@@ -203,25 +203,18 @@ function GeneralStats({ stats }: { stats: MatchStats }) {
                 v2={p2.total_games_won}
             />
             <StatBar 
-                label="Puntos Totales"
-                v1={p1.total_points_won}
-                v2={p2.total_points_won}
+                label="Juegos de Saque Ganados"
+                v1={p1.serve.service_games_won}
+                v2={p2.serve.service_games_won}
+                format="fraction"
+                t1={p1.serve.service_games_total}
+                t2={p2.serve.service_games_total}
             />
-            {(p1.winners > 0 || p2.winners > 0) && (
-                <StatBar 
-                    label="Winners"
-                    v1={p1.winners}
-                    v2={p2.winners}
-                />
-            )}
-            {(p1.unforced_errors > 0 || p2.unforced_errors > 0) && (
-                <StatBar 
-                    label="Errores No Forzados"
-                    v1={p1.unforced_errors}
-                    v2={p2.unforced_errors}
-                    higherIsBetter={false}
-                />
-            )}
+            <StatBar 
+                label="Breaks Realizados"
+                v1={p1.return.return_games_won}
+                v2={p2.return.return_games_won}
+            />
         </View>
     );
 }
@@ -234,37 +227,16 @@ function ServeStats({ stats }: { stats: MatchStats }) {
     const p1 = stats.player1.serve;
     const p2 = stats.player2.serve;
 
+    // Calcular % de juegos de saque ganados
+    const p1ServePct = p1.service_games_total > 0 
+        ? Math.round((p1.service_games_won / p1.service_games_total) * 100) 
+        : 0;
+    const p2ServePct = p2.service_games_total > 0 
+        ? Math.round((p2.service_games_won / p2.service_games_total) * 100) 
+        : 0;
+
     return (
         <View style={styles.statsSection}>
-            <StatBar 
-                label="Aces"
-                v1={p1.aces}
-                v2={p2.aces}
-            />
-            <StatBar 
-                label="Dobles Faltas"
-                v1={p1.double_faults}
-                v2={p2.double_faults}
-                higherIsBetter={false}
-            />
-            <StatBar 
-                label="% 1er Servicio"
-                v1={p1.first_serve_pct}
-                v2={p2.first_serve_pct}
-                format="percent"
-            />
-            <StatBar 
-                label="% Pts con 1er Servicio"
-                v1={p1.first_serve_won_pct}
-                v2={p2.first_serve_won_pct}
-                format="percent"
-            />
-            <StatBar 
-                label="% Pts con 2do Servicio"
-                v1={p1.second_serve_won_pct}
-                v2={p2.second_serve_won_pct}
-                format="percent"
-            />
             <StatBar 
                 label="Juegos de Saque Ganados"
                 v1={p1.service_games_won}
@@ -273,44 +245,58 @@ function ServeStats({ stats }: { stats: MatchStats }) {
                 t1={p1.service_games_total}
                 t2={p2.service_games_total}
             />
+            <StatBar 
+                label="% Juegos al Saque"
+                v1={p1ServePct}
+                v2={p2ServePct}
+                format="percent"
+            />
+            <StatBar 
+                label="Total Juegos al Saque"
+                v1={p1.service_games_total}
+                v2={p2.service_games_total}
+            />
         </View>
     );
 }
 
 // ============================================================
-// RETURN STATS
+// RETURN STATS (Breaks)
 // ============================================================
 
 function ReturnStats({ stats }: { stats: MatchStats }) {
     const p1 = stats.player1.return;
     const p2 = stats.player2.return;
 
+    // Calcular % de breaks (juegos de resto ganados)
+    const p1BreakPct = p1.return_games_total > 0 
+        ? Math.round((p1.return_games_won / p1.return_games_total) * 100) 
+        : 0;
+    const p2BreakPct = p2.return_games_total > 0 
+        ? Math.round((p2.return_games_won / p2.return_games_total) * 100) 
+        : 0;
+
     return (
         <View style={styles.statsSection}>
             <StatBar 
-                label="Puntos Ganados al Resto"
-                v1={p1.return_points_won}
-                v2={p2.return_points_won}
-                format="fraction"
-                t1={p1.return_points_total}
-                t2={p2.return_points_total}
-            />
-            <StatBar 
-                label="Juegos de Resto Ganados"
+                label="Breaks Realizados"
                 v1={p1.return_games_won}
                 v2={p2.return_games_won}
                 format="fraction"
                 t1={p1.return_games_total}
                 t2={p2.return_games_total}
             />
-            {p1.return_points_total > 0 && (
-                <StatBar 
-                    label="% Puntos al Resto"
-                    v1={safePercentage(p1.return_points_won, p1.return_points_total)}
-                    v2={safePercentage(p2.return_points_won, p2.return_points_total)}
-                    format="percent"
-                />
-            )}
+            <StatBar 
+                label="% Breaks"
+                v1={p1BreakPct}
+                v2={p2BreakPct}
+                format="percent"
+            />
+            <StatBar 
+                label="Oportunidades de Break"
+                v1={p1.return_games_total}
+                v2={p2.return_games_total}
+            />
         </View>
     );
 }
@@ -323,8 +309,27 @@ function BreakPointsStats({ stats }: { stats: MatchStats }) {
     const p1 = stats.player1.break_points;
     const p2 = stats.player2.break_points;
 
+    // Calcular porcentajes
+    const p1ConvPct = p1.break_points_total > 0 
+        ? Math.round((p1.break_points_won / p1.break_points_total) * 100) 
+        : 0;
+    const p2ConvPct = p2.break_points_total > 0 
+        ? Math.round((p2.break_points_won / p2.break_points_total) * 100) 
+        : 0;
+    
+    const p1SavePct = p1.break_points_faced > 0 
+        ? Math.round((p1.break_points_saved / p1.break_points_faced) * 100) 
+        : 0;
+    const p2SavePct = p2.break_points_faced > 0 
+        ? Math.round((p2.break_points_saved / p2.break_points_faced) * 100) 
+        : 0;
+
     return (
         <View style={styles.statsSection}>
+            {/* Sección: Convertir BP (ofensivo) */}
+            <View style={styles.subSectionHeader}>
+                <Text style={styles.subSectionTitle}>🎯 Conversión de BP</Text>
+            </View>
             <StatBar 
                 label="BP Convertidos"
                 v1={p1.break_points_won}
@@ -333,14 +338,19 @@ function BreakPointsStats({ stats }: { stats: MatchStats }) {
                 t1={p1.break_points_total}
                 t2={p2.break_points_total}
             />
-            {p1.break_points_total > 0 && (
+            {(p1.break_points_total > 0 || p2.break_points_total > 0) && (
                 <StatBar 
-                    label="% Conversión BP"
-                    v1={safePercentage(p1.break_points_won, p1.break_points_total)}
-                    v2={safePercentage(p2.break_points_won, p2.break_points_total)}
+                    label="% Conversión"
+                    v1={p1ConvPct}
+                    v2={p2ConvPct}
                     format="percent"
                 />
             )}
+
+            {/* Sección: Salvar BP (defensivo) */}
+            <View style={[styles.subSectionHeader, { marginTop: 20 }]}>
+                <Text style={styles.subSectionTitle}>🛡️ Defensa de BP</Text>
+            </View>
             <StatBar 
                 label="BP Enfrentados"
                 v1={p1.break_points_faced}
@@ -355,11 +365,11 @@ function BreakPointsStats({ stats }: { stats: MatchStats }) {
                 t1={p1.break_points_faced}
                 t2={p2.break_points_faced}
             />
-            {p1.break_points_faced > 0 && (
+            {(p1.break_points_faced > 0 || p2.break_points_faced > 0) && (
                 <StatBar 
-                    label="% BP Salvados"
-                    v1={safePercentage(p1.break_points_saved, p1.break_points_faced)}
-                    v2={safePercentage(p2.break_points_saved, p2.break_points_faced)}
+                    label="% Salvados"
+                    v1={p1SavePct}
+                    v2={p2SavePct}
                     format="percent"
                 />
             )}
@@ -447,7 +457,17 @@ const styles = StyleSheet.create({
 
     // Stats Section
     statsSection: {
-        gap: 20,
+        gap: 16,
+    },
+
+    // Sub Section Header
+    subSectionHeader: {
+        marginBottom: 4,
+    },
+    subSectionTitle: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: COLORS.textSecondary,
     },
 
     // Stat Bar

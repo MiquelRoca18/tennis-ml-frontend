@@ -2,28 +2,90 @@
  * H2HTabV2 - Tab de Head to Head
  * ===============================
  * 
- * Muestra el historial de enfrentamientos entre los jugadores:
- * - Balance general
- * - Balance por superficie
- * - Últimos enfrentamientos
+ * Muestra el historial de enfrentamientos entre los jugadores.
+ * Carga los datos bajo demanda desde el endpoint /v2/matches/{id}/h2h
  */
 
-import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { H2HData, MatchFullResponse, PreviousMatch, getShortName } from '../../../../../src/types/matchDetail';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import apiClient from '../../../../../src/services/api/apiClient';
+import { MatchFullResponse, getShortName } from '../../../../../src/types/matchDetail';
 import { COLORS } from '../../../../../src/utils/constants';
 
 interface H2HTabV2Props {
     data: MatchFullResponse;
 }
 
-export default function H2HTabV2({ data }: H2HTabV2Props) {
-    const { h2h, player1, player2 } = data;
+interface H2HResponse {
+    success: boolean;
+    message?: string;
+    total_matches: number;
+    player1_wins: number;
+    player2_wins: number;
+    surface_records?: {
+        Hard: [number, number];
+        Clay: [number, number];
+        Grass: [number, number];
+    };
+    recent_matches?: {
+        date: string;
+        tournament: string;
+        surface: string;
+        winner: number;
+        score: string;
+    }[];
+}
 
+export default function H2HTabV2({ data }: H2HTabV2Props) {
+    const [h2hData, setH2hData] = useState<H2HResponse | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    const { player1, player2 } = data;
     const p1Short = getShortName(player1.name);
     const p2Short = getShortName(player2.name);
 
-    if (!h2h || h2h.total_matches === 0) {
+    useEffect(() => {
+        loadH2H();
+    }, [data.match.id]);
+
+    const loadH2H = async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            const response = await apiClient.get<H2HResponse>(`/v2/matches/${data.match.id}/h2h`);
+            setH2hData(response.data);
+        } catch (err) {
+            setError('Error al cargar el historial');
+            console.error('Error loading H2H:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Loading
+    if (loading) {
+        return (
+            <View style={styles.centerContainer}>
+                <ActivityIndicator size="large" color={COLORS.primary} />
+                <Text style={styles.loadingText}>Cargando historial...</Text>
+            </View>
+        );
+    }
+
+    // Error
+    if (error) {
+        return (
+            <View style={styles.emptyContainer}>
+                <Text style={styles.emptyIcon}>⚠️</Text>
+                <Text style={styles.emptyTitle}>Error</Text>
+                <Text style={styles.emptyText}>{error}</Text>
+            </View>
+        );
+    }
+
+    // No data
+    if (!h2hData || h2hData.total_matches === 0) {
         return (
             <View style={styles.emptyContainer}>
                 <Text style={styles.emptyIcon}>🤝</Text>
@@ -34,6 +96,9 @@ export default function H2HTabV2({ data }: H2HTabV2Props) {
             </View>
         );
     }
+
+    const h2h = h2hData;
+    const surfaceRecords = h2h.surface_records || { Hard: [0, 0], Clay: [0, 0], Grass: [0, 0] };
 
     return (
         <ScrollView 
@@ -46,19 +111,16 @@ export default function H2HTabV2({ data }: H2HTabV2Props) {
                 <Text style={styles.balanceTitle}>Balance General</Text>
                 
                 <View style={styles.balanceMain}>
-                    {/* Player 1 */}
                     <View style={styles.balancePlayer}>
                         <Text style={styles.balanceWins}>{h2h.player1_wins}</Text>
                         <Text style={[styles.balanceName, styles.balanceNameP1]}>{p1Short}</Text>
                     </View>
 
-                    {/* VS */}
                     <View style={styles.balanceVs}>
                         <Text style={styles.balanceVsText}>VS</Text>
                         <Text style={styles.balanceTotal}>{h2h.total_matches} partidos</Text>
                     </View>
 
-                    {/* Player 2 */}
                     <View style={styles.balancePlayer}>
                         <Text style={styles.balanceWins}>{h2h.player2_wins}</Text>
                         <Text style={[styles.balanceName, styles.balanceNameP2]}>{p2Short}</Text>
@@ -67,18 +129,8 @@ export default function H2HTabV2({ data }: H2HTabV2Props) {
 
                 {/* Win Bar */}
                 <View style={styles.winBar}>
-                    <View 
-                        style={[
-                            styles.winBarP1,
-                            { flex: h2h.player1_wins || 0.1 }
-                        ]} 
-                    />
-                    <View 
-                        style={[
-                            styles.winBarP2,
-                            { flex: h2h.player2_wins || 0.1 }
-                        ]} 
-                    />
+                    <View style={[styles.winBarP1, { flex: h2h.player1_wins || 0.1 }]} />
+                    <View style={[styles.winBarP2, { flex: h2h.player2_wins || 0.1 }]} />
                 </View>
             </View>
 
@@ -90,21 +142,21 @@ export default function H2HTabV2({ data }: H2HTabV2Props) {
                     <SurfaceRecord 
                         surface="Hard"
                         icon="🎾"
-                        record={h2h.hard_record}
+                        record={surfaceRecords.Hard}
                         p1Name={p1Short}
                         p2Name={p2Short}
                     />
                     <SurfaceRecord 
                         surface="Clay"
                         icon="🧱"
-                        record={h2h.clay_record}
+                        record={surfaceRecords.Clay}
                         p1Name={p1Short}
                         p2Name={p2Short}
                     />
                     <SurfaceRecord 
                         surface="Grass"
                         icon="🌿"
-                        record={h2h.grass_record}
+                        record={surfaceRecords.Grass}
                         p1Name={p1Short}
                         p2Name={p2Short}
                     />
@@ -112,11 +164,11 @@ export default function H2HTabV2({ data }: H2HTabV2Props) {
             </View>
 
             {/* Previous Matches */}
-            {h2h.matches.length > 0 && (
+            {h2h.recent_matches && h2h.recent_matches.length > 0 && (
                 <View style={styles.matchesCard}>
                     <Text style={styles.cardTitle}>📅 Últimos Enfrentamientos</Text>
                     
-                    {h2h.matches.map((match, idx) => (
+                    {h2h.recent_matches.map((match, idx) => (
                         <PreviousMatchRow 
                             key={idx}
                             match={match}
@@ -182,14 +234,19 @@ function SurfaceRecord({ surface, icon, record, p1Name, p2Name }: SurfaceRecordP
 // ============================================================
 
 interface PreviousMatchRowProps {
-    match: PreviousMatch;
+    match: {
+        date: string;
+        tournament: string;
+        surface: string;
+        winner: number;
+        score: string;
+    };
     p1Name: string;
     p2Name: string;
 }
 
 function PreviousMatchRow({ match, p1Name, p2Name }: PreviousMatchRowProps) {
     const winner = match.winner === 1 ? p1Name : p2Name;
-    const loser = match.winner === 1 ? p2Name : p1Name;
 
     const formatDate = (dateStr: string) => {
         const date = new Date(dateStr);
@@ -238,6 +295,18 @@ const styles = StyleSheet.create({
         padding: 16,
         paddingBottom: 32,
         gap: 16,
+    },
+    centerContainer: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 40,
+        backgroundColor: COLORS.background,
+    },
+    loadingText: {
+        marginTop: 12,
+        fontSize: 14,
+        color: COLORS.textSecondary,
     },
 
     // Balance Card

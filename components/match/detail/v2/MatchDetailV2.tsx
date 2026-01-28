@@ -72,10 +72,9 @@ export default function MatchDetailV2({ matchId }: MatchDetailV2Props) {
         );
     }
 
-    // Determine which tabs to show
-    const showStatsTab = data.stats?.has_detailed_stats || false;
-    const showTimelineTab = data.timeline && data.timeline.sets.length > 0;
-    const showH2HTab = data.h2h && data.h2h.total_matches > 0;
+    // Mostrar tabs siempre (cada una maneja su estado vacío)
+    const isPending = data.match.status === 'pendiente';
+    const isCompleted = data.match.status === 'completado';
 
     return (
         <View style={styles.container}>
@@ -112,7 +111,8 @@ export default function MatchDetailV2({ matchId }: MatchDetailV2Props) {
                     {() => <OverviewTabV2 data={data} />}
                 </Tab.Screen>
 
-                {showStatsTab && (
+                {/* Stats - solo para partidos terminados/en juego */}
+                {!isPending && (
                     <Tab.Screen 
                         name="Stats" 
                         options={{ tabBarLabel: 'STATS' }}
@@ -121,7 +121,8 @@ export default function MatchDetailV2({ matchId }: MatchDetailV2Props) {
                     </Tab.Screen>
                 )}
 
-                {showTimelineTab && (
+                {/* Timeline - solo para partidos terminados/en juego */}
+                {!isPending && (
                     <Tab.Screen 
                         name="Timeline" 
                         options={{ tabBarLabel: 'TIMELINE' }}
@@ -130,14 +131,13 @@ export default function MatchDetailV2({ matchId }: MatchDetailV2Props) {
                     </Tab.Screen>
                 )}
 
-                {showH2HTab && (
-                    <Tab.Screen 
-                        name="H2H" 
-                        options={{ tabBarLabel: 'H2H' }}
-                    >
-                        {() => <H2HTabV2 data={data} />}
-                    </Tab.Screen>
-                )}
+                {/* H2H - siempre visible */}
+                <Tab.Screen 
+                    name="H2H" 
+                    options={{ tabBarLabel: 'H2H' }}
+                >
+                    {() => <H2HTabV2 data={data} />}
+                </Tab.Screen>
             </Tab.Navigator>
         </View>
     );

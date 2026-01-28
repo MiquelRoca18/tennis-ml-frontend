@@ -10,7 +10,7 @@
 
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { MatchFullResponse, getShortName, safePercentage } from '../../../../../src/types/matchDetail';
+import { MatchFullResponse, MatchOdds, getShortName, safePercentage } from '../../../../../src/types/matchDetail';
 import { COLORS } from '../../../../../src/utils/constants';
 
 interface OverviewTabV2Props {
@@ -18,9 +18,10 @@ interface OverviewTabV2Props {
 }
 
 export default function OverviewTabV2({ data }: OverviewTabV2Props) {
-    const { match, player1, player2, scores, stats, prediction } = data;
+    const { match, player1, player2, scores, stats, prediction, odds } = data;
     const p1Short = getShortName(player1.name);
     const p2Short = getShortName(player2.name);
+    const isPending = match.status === 'pendiente';
 
     return (
         <ScrollView 
@@ -31,17 +32,16 @@ export default function OverviewTabV2({ data }: OverviewTabV2Props) {
             {/* Match Info Card */}
             <MatchInfoCard data={data} />
 
-            {/* Score por Sets */}
-            {scores && scores.sets.length > 0 && (
-                <ScoreBySet 
-                    sets={scores.sets} 
-                    p1Name={p1Short} 
+            {/* Cuotas para partidos pendientes */}
+            {isPending && odds && (
+                <OddsCard 
+                    odds={odds}
+                    p1Name={p1Short}
                     p2Name={p2Short}
-                    winner={data.winner}
                 />
             )}
 
-            {/* Key Stats */}
+            {/* Key Stats (solo si hay datos) */}
             {stats && stats.has_detailed_stats && (
                 <KeyStatsCard 
                     stats={stats} 
@@ -59,19 +59,13 @@ export default function OverviewTabV2({ data }: OverviewTabV2Props) {
                 />
             )}
 
-            {/* No Data State */}
-            {!scores && !stats && (
+            {/* Info para partidos pendientes */}
+            {isPending && !prediction && !odds && (
                 <View style={styles.emptyCard}>
-                    <Text style={styles.emptyIcon}>📊</Text>
-                    <Text style={styles.emptyTitle}>
-                        {match.status === 'pendiente' 
-                            ? 'Partido Programado' 
-                            : 'Datos No Disponibles'}
-                    </Text>
+                    <Text style={styles.emptyIcon}>🎾</Text>
+                    <Text style={styles.emptyTitle}>Partido Programado</Text>
                     <Text style={styles.emptyText}>
-                        {match.status === 'pendiente'
-                            ? 'Las estadísticas estarán disponibles cuando comience el partido.'
-                            : 'Las estadísticas detalladas no están disponibles para este partido.'}
+                        La predicción y cuotas estarán disponibles próximamente.
                     </Text>
                 </View>
             )}
@@ -138,7 +132,69 @@ function InfoRow({ label, value, highlight }: { label: string; value: string; hi
 }
 
 // ============================================================
-// SCORE BY SET
+// ODDS CARD (para partidos pendientes)
+// ============================================================
+
+function OddsCard({ odds, p1Name, p2Name }: {
+    odds: MatchOdds;
+    p1Name: string;
+    p2Name: string;
+}) {
+    const favorito = odds.market_consensus;
+    
+    return (
+        <View style={styles.card}>
+            <Text style={styles.cardTitle}>💰 Cuotas</Text>
+            
+            <View style={styles.oddsContainer}>
+                {/* Player 1 Odds */}
+                <View style={[
+                    styles.oddsBox,
+                    favorito === 1 && styles.oddsBoxFavorite
+                ]}>
+                    <Text style={styles.oddsPlayer}>{p1Name}</Text>
+                    <Text style={[
+                        styles.oddsValue,
+                        favorito === 1 && styles.oddsValueFavorite
+                    ]}>
+                        {odds.best_odds_player1?.toFixed(2) || '-'}
+                    </Text>
+                    {favorito === 1 && (
+                        <Text style={styles.favoriteLabel}>FAVORITO</Text>
+                    )}
+                </View>
+
+                <Text style={styles.oddsVs}>VS</Text>
+
+                {/* Player 2 Odds */}
+                <View style={[
+                    styles.oddsBox,
+                    favorito === 2 && styles.oddsBoxFavorite
+                ]}>
+                    <Text style={styles.oddsPlayer}>{p2Name}</Text>
+                    <Text style={[
+                        styles.oddsValue,
+                        favorito === 2 && styles.oddsValueFavorite
+                    ]}>
+                        {odds.best_odds_player2?.toFixed(2) || '-'}
+                    </Text>
+                    {favorito === 2 && (
+                        <Text style={styles.favoriteLabel}>FAVORITO</Text>
+                    )}
+                </View>
+            </View>
+
+            {odds.bookmakers.length > 0 && (
+                <Text style={styles.oddsSource}>
+                    Fuente: {odds.bookmakers[0].bookmaker}
+                </Text>
+            )}
+        </View>
+    );
+}
+
+// ============================================================
+// SCORE BY SET (no usado - ya está en Hero)
 // ============================================================
 
 function ScoreBySet({ sets, p1Name, p2Name, winner }: { 
@@ -445,6 +501,59 @@ const styles = StyleSheet.create({
     },
     infoValueHighlight: {
         color: COLORS.primary,
+    },
+
+    // Odds Card
+    oddsContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+    },
+    oddsBox: {
+        flex: 1,
+        backgroundColor: COLORS.background,
+        borderRadius: 12,
+        padding: 16,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: COLORS.border,
+    },
+    oddsBoxFavorite: {
+        borderColor: COLORS.primary,
+        backgroundColor: COLORS.primary + '10',
+    },
+    oddsPlayer: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: COLORS.textSecondary,
+        marginBottom: 8,
+    },
+    oddsValue: {
+        fontSize: 28,
+        fontWeight: '800',
+        color: COLORS.textPrimary,
+    },
+    oddsValueFavorite: {
+        color: COLORS.primary,
+    },
+    favoriteLabel: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: COLORS.primary,
+        marginTop: 4,
+        letterSpacing: 1,
+    },
+    oddsVs: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: COLORS.textSecondary,
+    },
+    oddsSource: {
+        fontSize: 11,
+        color: COLORS.textSecondary,
+        textAlign: 'center',
+        marginTop: 12,
     },
 
     // Score By Set

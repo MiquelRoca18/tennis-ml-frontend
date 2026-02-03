@@ -15,6 +15,7 @@ import 'react-native-reanimated';
 
 import { Colors } from '@/constants/Colors';
 import { ThemeProvider } from '@/contexts/ThemeContext';
+import { AuthProvider } from '@/src/contexts/AuthContext';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -56,21 +57,28 @@ export default function RootLayout() {
   if (!fontsLoaded) return null;
 
   return (
-    <ThemeProvider>
-      <NavigationThemeProvider value={CustomDarkTheme}>
-        <Stack
-          screenOptions={{
-            headerStyle: { backgroundColor: Colors.background.secondary },
-            headerTintColor: Colors.text.primary,
-            headerTitleStyle: { fontFamily: 'Inter-Bold' },
-            contentStyle: { backgroundColor: Colors.background.primary },
-          }}
-        >
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-        </Stack>
-        <StatusBar style="light" />
-      </NavigationThemeProvider>
-    </ThemeProvider>
+    <AuthProvider>
+      <ThemeProvider>
+        <NavigationThemeProvider value={CustomDarkTheme}>
+          <Stack
+            screenOptions={{
+              headerStyle: { backgroundColor: Colors.background.secondary },
+              headerTintColor: Colors.text.primary,
+              headerTitleStyle: { fontFamily: 'Inter-Bold' },
+              contentStyle: { backgroundColor: Colors.background.primary },
+            }}
+          >
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+            <Stack.Screen name="match/[id]" />
+            <Stack.Screen name="player/[key]" />
+            <Stack.Screen name="tournament/[key]" />
+            <Stack.Screen name="settings" />
+            <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+          </Stack>
+          <StatusBar style="light" />
+        </NavigationThemeProvider>
+      </ThemeProvider>
+    </AuthProvider>
   );
 }

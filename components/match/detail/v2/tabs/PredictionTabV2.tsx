@@ -15,9 +15,10 @@ import { COLORS } from '../../../../../src/utils/constants';
 
 interface PredictionTabV2Props {
     data: MatchFullResponse;
+    scrollable?: boolean;
 }
 
-export default function PredictionTabV2({ data }: PredictionTabV2Props) {
+export default function PredictionTabV2({ data, scrollable = true }: PredictionTabV2Props) {
     const { prediction, player1, player2, odds } = data;
 
     const p1Short = getShortName(player1.name);
@@ -56,12 +57,8 @@ export default function PredictionTabV2({ data }: PredictionTabV2Props) {
     const hasValueBet = prediction.value_bet !== null && prediction.value_bet !== undefined;
     const valueBetPlayer = prediction.value_bet === 1 ? p1Short : p2Short;
 
-    return (
-        <ScrollView 
-            style={styles.container}
-            contentContainerStyle={styles.content}
-            showsVerticalScrollIndicator={false}
-        >
+    const content = (
+        <>
             {/* Main Prediction Card */}
             <View style={styles.mainCard}>
                 <View style={styles.cardHeader}>
@@ -152,12 +149,21 @@ export default function PredictionTabV2({ data }: PredictionTabV2Props) {
             <View style={styles.modelInfo}>
                 <Text style={styles.modelInfoTitle}>Sobre la predicción</Text>
                 <Text style={styles.modelInfoText}>
-                    Predicción generada por nuestro modelo de Machine Learning basado en 
-                    estadísticas históricas, forma reciente, H2H, superficie y otros factores.
+                Predicción generada por nuestro modelo de Machine Learning basado en 
+                estadísticas históricas, forma reciente, H2H, superficie y otros factores.
                 </Text>
             </View>
-        </ScrollView>
+        </>
     );
+
+    if (scrollable) {
+        return (
+            <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+                {content}
+            </ScrollView>
+        );
+    }
+    return <View style={[styles.container, styles.content]}>{content}</View>;
 }
 
 const styles = StyleSheet.create({

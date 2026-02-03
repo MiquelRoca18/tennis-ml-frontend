@@ -1,6 +1,23 @@
 /**
  * Date utility functions for the tennis match feed
+ *
+ * IMPORTANTE: new Date("YYYY-MM-DD") en JavaScript interpreta la fecha como medianoche UTC,
+ * lo que causa desfases de un día en zonas horarias negativas (ej. América).
+ * Usamos parseLocalDate() para interpretar YYYY-MM-DD como fecha local.
  */
+
+/**
+ * Parsea YYYY-MM-DD como fecha local (medianoche en la zona del usuario).
+ * Evita el bug de JS donde new Date("YYYY-MM-DD") se interpreta como UTC.
+ */
+export function parseLocalDate(dateString: string): Date {
+    const dateOnly = dateString.slice(0, 10); // YYYY-MM-DD (ignora T00:00:00 etc.)
+    const [y, m, d] = dateOnly.split('-').map(Number);
+    if (Number.isNaN(y) || Number.isNaN(m) || Number.isNaN(d)) {
+        return new Date(); // fallback
+    }
+    return new Date(y, m - 1, d);
+}
 
 /**
  * Get today's date in YYYY-MM-DD format
@@ -40,7 +57,7 @@ export function isToday(dateString: string): boolean {
  * Check if a date string is in the past
  */
 export function isPast(dateString: string): boolean {
-    const date = new Date(dateString);
+    const date = parseLocalDate(dateString);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     date.setHours(0, 0, 0, 0);
@@ -51,11 +68,26 @@ export function isPast(dateString: string): boolean {
  * Check if a date string is in the future
  */
 export function isFuture(dateString: string): boolean {
-    const date = new Date(dateString);
+    const date = parseLocalDate(dateString);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     date.setHours(0, 0, 0, 0);
     return date > today;
+}
+
+/**
+ * Check if the match scheduled start (fecha + hora) is in the past (match has started).
+ * Used to avoid showing "EN VIVO" for matches that are marked en_juego but haven't started yet.
+ * @param fecha - YYYY-MM-DD
+ * @param hora - HH:MM or HH:MM:SS, or null
+ */
+export function isMatchStarted(fecha: string, hora: string | null): boolean {
+    if (!hora) return false;
+    const [h, m] = hora.split(':').map(Number);
+    if (Number.isNaN(h) || Number.isNaN(m)) return false;
+    const start = parseLocalDate(fecha);
+    start.setHours(h, m, 0, 0);
+    return start.getTime() <= Date.now();
 }
 
 /**
@@ -80,7 +112,7 @@ export function getDateRange(daysBefore: number = 7, daysAfter: number = 7): str
  * Format date for short display (e.g., "Lun 13")
  */
 export function formatDateShort(dateString: string): { dayName: string; dayNumber: string } {
-    const date = new Date(dateString);
+    const date = parseLocalDate(dateString);
     const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
     return {
@@ -93,7 +125,7 @@ export function formatDateShort(dateString: string): { dayName: string; dayNumbe
  * Format day of week in Spanish
  */
 export function formatDayOfWeek(dateString: string): string {
-    const date = new Date(dateString);
+    const date = parseLocalDate(dateString);
     const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
     return dayNames[date.getDay()];
 }
@@ -102,7 +134,7 @@ export function formatDayOfWeek(dateString: string): string {
  * Format date for display (e.g., "Lunes, 13 de Enero")
  */
 export function formatDateLong(dateString: string): string {
-    const date = new Date(dateString);
+    const date = parseLocalDate(dateString);
     const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
     const monthNames = [
         'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',

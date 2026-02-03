@@ -1,70 +1,79 @@
-import { useEffect, useState } from 'react';
-import { Favorite, getFavorites, isFavorite, toggleFavorite } from '../services/favoritesService';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  Favorite,
+  getFavorites,
+  isFavorite,
+  toggleFavorite,
+} from '../services/favoritesService';
+import { useAuth } from '../contexts/AuthContext';
+import { useFavoritesRefresh } from '../contexts/FavoritesRefreshContext';
 
 /**
- * Hook to manage favorites
+ * Hook para gestionar la lista de favoritos
+ * Usa Supabase si hay usuario, AsyncStorage si no
  */
 export function useFavorites() {
-    const [favorites, setFavorites] = useState<Favorite[]>([]);
-    const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  const [favorites, setFavorites] = useState<Favorite[]>([]);
+  const [loading, setLoading] = useState(true);
 
-    const loadFavorites = async () => {
-        setLoading(true);
-        const favs = await getFavorites();
-        setFavorites(favs);
-        setLoading(false);
-    };
+  const loadFavorites = useCallback(async () => {
+    setLoading(true);
+    const favs = await getFavorites(user?.id);
+    setFavorites(favs);
+    setLoading(false);
+  }, [user?.id]);
 
-    useEffect(() => {
-        loadFavorites();
-    }, []);
+  useEffect(() => {
+    loadFavorites();
+  }, [loadFavorites]);
 
-    const refresh = () => {
-        loadFavorites();
-    };
+  const refresh = useCallback(() => loadFavorites(), [loadFavorites]);
 
-    return {
-        favorites,
-        loading,
-        refresh,
-    };
+  return { favorites, loading, refresh };
 }
 
 /**
- * Hook to check if a match is favorited
+ * Hook para comprobar si un partido es favorito y hacer toggle
  */
 export function useIsFavorite(matchId: number | null) {
-    const [favorited, setFavorited] = useState(false);
-    const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  const { refreshTrigger } = useFavoritesRefresh();
+  const [favorited, setFavorited] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-    const checkFavorite = async () => {
-        if (!matchId) {
-            setFavorited(false);
-            setLoading(false);
-            return;
-        }
+  const checkFavorite = useCallback(async () => {
+    if (!matchId) {
+      setFavorited(false);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    const isFav = await isFavorite(matchId, user?.id);
+    setFavorited(isFav);
+    setLoading(false);
+  }, [matchId, user?.id]);
 
-        setLoading(true);
-        const isFav = await isFavorite(matchId);
-        setFavorited(isFav);
-        setLoading(false);
-    };
+  useEffect(() => {
+    checkFavorite();
+  }, [checkFavorite, refreshTrigger]);
 
-    useEffect(() => {
-        checkFavorite();
-    }, [matchId]);
+  const toggle = async (matchData: {
+    player1Name: string;
+    player2Name: string;
+    tournament: string;
+    eventKey?: string;
+  }): Promise<boolean> => {
+    if (!matchId) return false;
+    const newStatus = await toggleFavorite(
+      matchId,
+      matchData,
+      user?.id,
+      matchData.eventKey
+    );
+    setFavorited(newStatus);
+    return newStatus;
+  };
 
-    const toggle = async (matchData: { player1Name: string; player2Name: string; tournament: string }) => {
-        if (!matchId) return;
-
-        const newStatus = await toggleFavorite(matchId, matchData);
-        setFavorited(newStatus);
-    };
-
-    return {
-        favorited,
-        loading,
-        toggle,
-        refresh: checkFavorite,
-    };
+  return { favorited, loading, toggle, refresh: checkFavorite };
 }

@@ -14,9 +14,10 @@ import { COLORS } from '../../../../../src/utils/constants';
 
 interface OddsTabV2Props {
     data: MatchFullResponse;
+    scrollable?: boolean;
 }
 
-export default function OddsTabV2({ data }: OddsTabV2Props) {
+export default function OddsTabV2({ data, scrollable = true }: OddsTabV2Props) {
     const [oddsData, setOddsData] = useState<DetailedOddsResponse | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -81,12 +82,8 @@ export default function OddsTabV2({ data }: OddsTabV2Props) {
     const bestP1 = oddsData.best_odds_player1;
     const bestP2 = oddsData.best_odds_player2;
 
-    return (
-        <ScrollView 
-            style={styles.container}
-            contentContainerStyle={styles.content}
-            showsVerticalScrollIndicator={false}
-        >
+    const content = (
+        <>
             {/* Header con mejores cuotas */}
             <View style={styles.bestOddsCard}>
                 <Text style={styles.bestOddsTitle}>🏆 Mejores Cuotas Disponibles</Text>
@@ -186,8 +183,17 @@ export default function OddsTabV2({ data }: OddsTabV2Props) {
                     Busca siempre la mejor cuota antes de apostar.
                 </Text>
             </View>
-        </ScrollView>
+        </>
     );
+
+    if (scrollable) {
+        return (
+            <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+                {content}
+            </ScrollView>
+        );
+    }
+    return <View style={[styles.container, styles.content]}>{content}</View>;
 }
 
 const styles = StyleSheet.create({

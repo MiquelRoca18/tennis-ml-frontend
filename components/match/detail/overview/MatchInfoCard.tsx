@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { COLORS } from '../../../../src/utils/constants';
+import { parseLocalDate } from '../../../../src/utils/dateUtils';
 
 interface MatchInfoCardProps {
     match: any;
@@ -43,7 +44,7 @@ export default function MatchInfoCard({ match, matchDetails }: MatchInfoCardProp
 
     const formatDate = (date: string) => {
         if (!date) return '';
-        const d = new Date(date);
+        const d = parseLocalDate(date);
         return d.toLocaleDateString('es-ES', {
             weekday: 'long',
             year: 'numeric',

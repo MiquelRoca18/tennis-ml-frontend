@@ -10,25 +10,24 @@
 
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { MatchFullResponse, getShortName, safePercentage } from '../../../../../src/types/matchDetail';
+import { MatchFullResponse, getShortName } from '../../../../../src/types/matchDetail';
 import { COLORS } from '../../../../../src/utils/constants';
+import { parseLocalDate } from '../../../../../src/utils/dateUtils';
 
 interface OverviewTabV2Props {
     data: MatchFullResponse;
+    /** Si false, usa View en lugar de ScrollView (para scroll unificado en padre) */
+    scrollable?: boolean;
 }
 
-export default function OverviewTabV2({ data }: OverviewTabV2Props) {
+export default function OverviewTabV2({ data, scrollable = true }: OverviewTabV2Props) {
     const { match, player1, player2, stats, prediction } = data;
     const p1Short = getShortName(player1.name);
     const p2Short = getShortName(player2.name);
     const isPending = match.status === 'pendiente';
 
-    return (
-        <ScrollView 
-            style={styles.container}
-            contentContainerStyle={styles.content}
-            showsVerticalScrollIndicator={false}
-        >
+    const content = (
+        <>
             {/* Match Info Card - Solo info básica */}
             <MatchInfoCard data={data} />
 
@@ -41,8 +40,8 @@ export default function OverviewTabV2({ data }: OverviewTabV2Props) {
                 />
             )}
 
-            {/* Prediction Preview (solo para partidos no pendientes) */}
-            {!isPending && prediction && (
+            {/* Prediction Preview - mostrar siempre que exista predicción (incluye pendientes) */}
+            {prediction && (
                 <PredictionPreview 
                     prediction={prediction}
                     p1Name={p1Short}
@@ -50,29 +49,46 @@ export default function OverviewTabV2({ data }: OverviewTabV2Props) {
                 />
             )}
 
-            {/* Info para partidos pendientes */}
-            {isPending && (
+            {/* Info para partidos pendientes SIN predicción */}
+            {isPending && !prediction && (
                 <View style={styles.emptyCard}>
                     <Text style={styles.emptyIcon}>🎾</Text>
                     <Text style={styles.emptyTitle}>Partido Programado</Text>
                     <Text style={styles.emptyText}>
-                        Consulta los tabs de Predicción y Cuotas para más información.
+                        La predicción se generará cuando haya cuotas disponibles. Consulta el tab de Cuotas.
                     </Text>
                 </View>
             )}
-        </ScrollView>
+        </>
     );
+
+    if (scrollable) {
+        return (
+            <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+                {content}
+            </ScrollView>
+        );
+    }
+    return <View style={[styles.container, styles.content]}>{content}</View>;
 }
 
 // ============================================================
 // MATCH INFO CARD
 // ============================================================
 
+function formatEventStatus(eventStatus: string): string {
+    const s = eventStatus.toLowerCase();
+    if (s.includes('retired') || s.includes('ret') || s.includes('retirement')) return 'Finalizado por retirada';
+    if (s.includes('walk') || s.includes('w.o') || s.includes('w/o')) return 'Walkover';
+    if (s.includes('default')) return 'Finalizado por default';
+    return eventStatus;
+}
+
 function MatchInfoCard({ data }: { data: MatchFullResponse }) {
     const { match } = data;
 
     const formatDate = (dateStr: string) => {
-        const date = new Date(dateStr);
+        const date = parseLocalDate(dateStr);
         return date.toLocaleDateString('es-ES', { 
             weekday: 'long', 
             day: 'numeric', 
@@ -89,6 +105,13 @@ function MatchInfoCard({ data }: { data: MatchFullResponse }) {
                 {match.time && <InfoRow label="Hora" value={match.time.slice(0, 5)} />}
                 {match.round && <InfoRow label="Ronda" value={match.round} />}
                 <InfoRow label="Superficie" value={match.surface} />
+                {match.status === 'completado' && match.event_status && (
+                    <InfoRow
+                        label="Motivo de finalización"
+                        value={formatEventStatus(match.event_status)}
+                        highlight={/retired|walk|w\.o|w\/o|default/i.test(match.event_status)}
+                    />
+                )}
             </View>
         </View>
     );
@@ -192,7 +215,7 @@ function ScoreBySet({ sets, p1Name, p2Name, winner }: {
 }
 
 // ============================================================
-// KEY STATS CARD
+// RESUMEN RÁPIDO - Estadísticas clave a vista
 // ============================================================
 
 function KeyStatsCard({ stats, p1Name, p2Name }: { 
@@ -202,104 +225,38 @@ function KeyStatsCard({ stats, p1Name, p2Name }: {
 }) {
     const p1 = stats.player1;
     const p2 = stats.player2;
+    const wue1 = p1.winners - p1.unforced_errors;
+    const wue2 = p2.winners - p2.unforced_errors;
 
     const keyStats = [
-        {
-            label: 'Juegos Ganados',
-            v1: p1.total_games_won,
-            v2: p2.total_games_won,
-        },
-        {
-            label: 'Juegos de Saque Ganados',
-            v1: p1.serve.service_games_won,
-            v2: p2.serve.service_games_won,
-            t1: p1.serve.service_games_total,
-            t2: p2.serve.service_games_total,
-            showPct: true,
-        },
-        {
-            label: 'Breaks Realizados',
-            v1: p1.break_points.break_points_won,
-            v2: p2.break_points.break_points_won,
-            t1: p1.break_points.break_points_total,
-            t2: p2.break_points.break_points_total,
-            showPct: true,
-        },
+        { label: 'Puntos', v1: p1.total_points_won, v2: p2.total_points_won },
+        { label: 'Juegos', v1: p1.total_games_won, v2: p2.total_games_won },
+        { label: 'Juegos Saque', v1: p1.serve.service_games_won, v2: p2.serve.service_games_won, t1: p1.serve.service_games_total, t2: p2.serve.service_games_total, showPct: true },
+        { label: 'Breaks', v1: p1.return?.return_games_won ?? 0, v2: p2.return?.return_games_won ?? 0 },
+        { label: 'Aces', v1: p1.serve.aces, v2: p2.serve.aces },
+        { label: 'Winners - UE', v1: wue1, v2: wue2 },
     ];
 
     return (
         <View style={styles.card}>
-            <Text style={styles.cardTitle}>📊 Estadísticas Clave</Text>
+            <Text style={styles.cardTitle}>📊 Resumen Rápido</Text>
+            <Text style={styles.cardSubtitle}>Estadísticas clave del partido</Text>
             
-            <View style={styles.statsHeader}>
-                <Text style={styles.statsHeaderName}>{p1Name}</Text>
-                <Text style={styles.statsHeaderLabel}></Text>
-                <Text style={styles.statsHeaderName}>{p2Name}</Text>
-            </View>
-
-            {keyStats.map((stat, idx) => (
-                <StatCompareRow 
-                    key={idx}
-                    label={stat.label}
-                    v1={stat.v1}
-                    v2={stat.v2}
-                    t1={stat.t1}
-                    t2={stat.t2}
-                    showPct={stat.showPct}
-                />
-            ))}
-        </View>
-    );
-}
-
-function StatCompareRow({ label, v1, v2, t1, t2, showPct }: {
-    label: string;
-    v1: number;
-    v2: number;
-    t1?: number;
-    t2?: number;
-    showPct?: boolean;
-}) {
-    const max = Math.max(v1, v2, 1);
-    const pct1 = (v1 / max) * 100;
-    const pct2 = (v2 / max) * 100;
-    const winner = v1 > v2 ? 1 : v2 > v1 ? 2 : 0;
-
-    const formatValue = (v: number, t?: number) => {
-        if (showPct && t !== undefined && t > 0) {
-            return `${v}/${t} (${safePercentage(v, t)}%)`;
-        }
-        return v.toString();
-    };
-
-    return (
-        <View style={styles.statRow}>
-            <View style={styles.statValue}>
-                <Text style={[styles.statValueText, winner === 1 && styles.statValueWinner]}>
-                    {formatValue(v1, t1)}
-                </Text>
-                <View style={styles.statBar}>
-                    <View style={[
-                        styles.statBarFill,
-                        styles.statBarP1,
-                        { width: `${pct1}%` }
-                    ]} />
-                </View>
-            </View>
-            
-            <Text style={styles.statLabel}>{label}</Text>
-            
-            <View style={styles.statValue}>
-                <View style={styles.statBar}>
-                    <View style={[
-                        styles.statBarFill,
-                        styles.statBarP2,
-                        { width: `${pct2}%` }
-                    ]} />
-                </View>
-                <Text style={[styles.statValueText, winner === 2 && styles.statValueWinner]}>
-                    {formatValue(v2, t2)}
-                </Text>
+            <View style={styles.quickStatsGrid}>
+                {keyStats.map((stat, idx) => (
+                    <View key={idx} style={styles.quickStatItem}>
+                        <View style={styles.quickStatValues}>
+                            <Text style={[styles.quickStatValue, stat.v1 > stat.v2 && styles.quickStatWinner]}>
+                                {stat.showPct && stat.t1 ? `${stat.v1}/${stat.t1}` : stat.v1}
+                            </Text>
+                            <Text style={styles.quickStatVs}>vs</Text>
+                            <Text style={[styles.quickStatValue, stat.v2 > stat.v1 && styles.quickStatWinner]}>
+                                {stat.showPct && stat.t2 ? `${stat.v2}/${stat.t2}` : stat.v2}
+                            </Text>
+                        </View>
+                        <Text style={styles.quickStatLabel}>{stat.label}</Text>
+                    </View>
+                ))}
             </View>
         </View>
     );
@@ -377,7 +334,52 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '700',
         color: COLORS.textPrimary,
+        marginBottom: 4,
+    },
+    cardSubtitle: {
+        fontSize: 12,
+        color: COLORS.textSecondary,
         marginBottom: 16,
+    },
+    quickStatsGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 10,
+    },
+    quickStatItem: {
+        flex: 1,
+        minWidth: 100,
+        maxWidth: '48%',
+        backgroundColor: COLORS.background,
+        borderRadius: 12,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+    },
+    quickStatValues: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 4,
+    },
+    quickStatValue: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: COLORS.textSecondary,
+        fontFamily: 'RobotoMono-Regular',
+    },
+    quickStatWinner: {
+        color: COLORS.textPrimary,
+    },
+    quickStatVs: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: COLORS.textSecondary,
+    },
+    quickStatLabel: {
+        fontSize: 11,
+        color: COLORS.textSecondary,
+        textAlign: 'center',
     },
     totalSets: {
         backgroundColor: COLORS.primary + '20',
@@ -410,7 +412,8 @@ const styles = StyleSheet.create({
         color: COLORS.textPrimary,
     },
     infoValueHighlight: {
-        color: COLORS.primary,
+        color: COLORS.warning,
+        fontWeight: '600',
     },
 
     // Odds Card

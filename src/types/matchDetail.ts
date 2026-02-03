@@ -62,6 +62,12 @@ export interface ServeStats {
     second_serve_won_pct: number;
     service_games_won: number;
     service_games_total: number;
+    /** Velocidad media 1er saque en km/h */
+    avg_first_serve_speed_kmh?: number | null;
+    /** Velocidad media 2do saque en km/h */
+    avg_second_serve_speed_kmh?: number | null;
+    service_points_won?: number;
+    service_points_total?: number;
 }
 
 export interface ReturnStats {
@@ -69,6 +75,10 @@ export interface ReturnStats {
     return_points_total: number;
     return_games_won: number;
     return_games_total: number;
+    /** % puntos ganados al 1er resto */
+    first_return_points_won_pct?: number | null;
+    /** % puntos ganados al 2do resto */
+    second_return_points_won_pct?: number | null;
 }
 
 export interface BreakPointStats {
@@ -86,6 +96,13 @@ export interface PlayerStats {
     total_games_won: number;
     winners: number;
     unforced_errors: number;
+    /** Puntos ganados en la red */
+    net_points_won?: number | null;
+    net_points_total?: number | null;
+    /** Puntos ganados en los últimos 10 (momentum) */
+    last_10_balls?: number | null;
+    /** Match points salvados */
+    match_points_saved?: number | null;
 }
 
 export interface MatchStats {
@@ -125,6 +142,8 @@ export interface MatchTimeline {
     total_games: number;
     total_breaks: number;
     momentum_shifts: number;
+    /** True si generado solo desde scores (sin pointbypoint). Orden de juegos desconocido. */
+    from_scores_only?: boolean;
 }
 
 // ============================================================
@@ -215,6 +234,8 @@ export interface MatchInfo {
     round?: string | null;
     surface: Surface;
     court?: string | null;
+    /** Motivo de finalización: "Finished", "Retired", "Walk Over", etc. */
+    event_status?: string | null;
 }
 
 export interface MatchFullResponse {

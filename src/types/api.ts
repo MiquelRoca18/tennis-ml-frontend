@@ -99,8 +99,10 @@ export interface Match {
     jugador1: Player;
     jugador2: Player;
     cuotas_top3: CuotasTop3;  // 🆕 Top 3 cuotas
-    prediccion: Prediction;
+    prediccion: Prediction | null;
     resultado: MatchResult | null;
+    /** Motivo de finalización: "Retired", "Walk Over", etc. Para mostrar en card. */
+    event_status?: string | null;
 }
 
 export interface MatchesResponse {

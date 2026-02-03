@@ -89,7 +89,6 @@ class Cache {
 
 // Create cache instances with different TTLs for different data types
 export const playerCache = new Cache(10); // 10 minutes - player data changes rarely
-export const rankingsCache = new Cache(60); // 1 hour - rankings update daily
 export const h2hCache = new Cache(30); // 30 minutes - H2H is static
 export const matchCache = new Cache(5); // 5 minutes - match data changes frequently
 export const tournamentCache = new Cache(60); // 1 hour - tournament data is static
@@ -128,7 +127,6 @@ export async function fetchWithCache<T>(
  */
 export function clearAllCaches(): void {
     playerCache.clear();
-    rankingsCache.clear();
     h2hCache.clear();
     matchCache.clear();
     tournamentCache.clear();
@@ -141,7 +139,6 @@ export function clearAllCaches(): void {
 export function getAllCacheStats() {
     return {
         player: playerCache.getStats(),
-        rankings: rankingsCache.getStats(),
         h2h: h2hCache.getStats(),
         match: matchCache.getStats(),
         tournament: tournamentCache.getStats(),

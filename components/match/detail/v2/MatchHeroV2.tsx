@@ -14,11 +14,42 @@
 
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { MatchFullResponse, SetScore, getShortName } from '../../../../src/types/matchDetail';
+import FavoriteButton from '../../../ui/FavoriteButton';
+import { useIsFavorite } from '../../../../src/hooks/useFavorites';
+import { MatchFullResponse, getShortName } from '../../../../src/types/matchDetail';
 import { COLORS } from '../../../../src/utils/constants';
 import { getCountryFlag } from '../../../../src/utils/countryUtils';
 import LiveBadge from '../../LiveBadge';
 import PlayerLogo from '../../PlayerLogo';
+
+/** Parsea tiebreak "7-5" → [7, 5], "3" → [7, 3]. Devuelve [ganador, perdedor]. */
+function parseTiebreakPoints(tb: string): [number, number] {
+    const t = tb.trim();
+    if (t.includes('-')) {
+        const [a, b] = t.split('-').map(s => parseInt(s.trim(), 10));
+        return [a ?? 7, b ?? 0];
+    }
+    const n = parseInt(t, 10);
+    return Number.isNaN(n) ? [7, 0] : [7, n];
+}
+
+/** True si el set está terminado (6-4, 7-5, 7-6, etc.). No poner verde si el set sigue en curso (ej. 6-5). */
+function isSetCompleted(p1: number, p2: number): boolean {
+    const lo = Math.min(p1, p2);
+    const hi = Math.max(p1, p2);
+    if (hi < 6) return false;
+    return hi - lo >= 2 || lo >= 6;
+}
+
+/** Etiqueta de cierre: retirada, walkover o finalizado */
+function getFinishLabel(eventStatus?: string | null): string {
+    if (!eventStatus) return 'FINALIZADO';
+    const s = eventStatus.toLowerCase();
+    if (s.includes('retired') || s.includes('ret') || s.includes('retirement')) return 'Finalizado por retirada';
+    if (s.includes('walk') || s.includes('w.o') || s.includes('w/o')) return 'Walkover';
+    if (s.includes('default')) return 'Finalizado por default';
+    return 'FINALIZADO';
+}
 
 interface MatchHeroV2Props {
     data: MatchFullResponse;
@@ -26,20 +57,42 @@ interface MatchHeroV2Props {
 
 export default function MatchHeroV2({ data }: MatchHeroV2Props) {
     const { match, player1, player2, winner, scores } = data;
+    const { favorited, loading: favLoading, toggle } = useIsFavorite(match.id);
     const isLive = match.status === 'en_juego';
     const isCompleted = match.status === 'completado';
     const isPending = match.status === 'pendiente';
 
-    // Scores
+    // Scores (resultado en sets; si no hay, 0-0)
     const setsWon = scores?.sets_won || [0, 0];
-    const sets = scores?.sets || [];
     const live = scores?.live;
+    // Solo resaltar en verde cuando hay un líder (o partido terminado con ganador). En empate (2-2) o sin ganador por retirada, nada en verde.
+    const showWinner1 = (isCompleted && winner === 1) || (isLive && setsWon[0] > setsWon[1]);
+    const showWinner2 = (isCompleted && winner === 2) || (isLive && setsWon[1] > setsWon[0]);
+    const isRetirementOrWalkover = Boolean(
+        match.event_status &&
+        /retired|ret|walk|w\.o|w\/o|default/i.test(match.event_status)
+    );
 
     return (
         <View style={styles.container}>
             {/* Tournament Info */}
             <View style={styles.tournamentSection}>
-                <Text style={styles.tournamentName}>{match.tournament}</Text>
+                <View style={styles.tournamentRow}>
+                    <Text style={styles.tournamentName}>{match.tournament}</Text>
+                    {!favLoading && (
+                        <FavoriteButton
+                            isFavorite={favorited}
+                            onPress={() =>
+                                toggle({
+                                    player1Name: player1.name,
+                                    player2Name: player2.name,
+                                    tournament: match.tournament ?? '',
+                                })
+                            }
+                            size={28}
+                        />
+                    )}
+                </View>
                 <View style={styles.metaRow}>
                     <View style={styles.surfaceBadge}>
                         <Text style={styles.surfaceText}>{match.surface}</Text>
@@ -54,7 +107,7 @@ export default function MatchHeroV2({ data }: MatchHeroV2Props) {
             <View style={styles.scoreSection}>
                 {/* Player 1 */}
                 <View style={styles.playerColumn}>
-                    <PlayerLogo logoUrl={player1.logo_url} size={72} />
+                    <PlayerLogo logoUrl={player1.logo_url ?? undefined} size={72} />
                     <View style={styles.playerInfo}>
                         {player1.country && (
                             <Text style={styles.flag}>{getCountryFlag(player1.country)}</Text>
@@ -62,7 +115,7 @@ export default function MatchHeroV2({ data }: MatchHeroV2Props) {
                         <Text 
                             style={[
                                 styles.playerName,
-                                winner === 1 && styles.winnerName
+                                showWinner1 && styles.winnerName
                             ]} 
                             numberOfLines={2}
                         >
@@ -85,18 +138,25 @@ export default function MatchHeroV2({ data }: MatchHeroV2Props) {
                         </View>
                     ) : (
                         <View style={styles.mainScore}>
-                            {/* Sets Won */}
+                            {/* Razón de cierre (retirada, walkover) arriba del resultado para que sea visible */}
+                            {isCompleted && isRetirementOrWalkover && (
+                                <Text style={styles.reasonText}>
+                                    {getFinishLabel(match.event_status)}
+                                </Text>
+                            )}
+
+                            {/* Sets Won: verde solo si hay líder o partido terminado con ganador; en empate (2-2) nada en verde */}
                             <View style={styles.setsWonRow}>
                                 <Text style={[
                                     styles.setsWonNumber,
-                                    setsWon[0] > setsWon[1] && styles.winnerScore
+                                    showWinner1 && styles.winnerScore
                                 ]}>
                                     {setsWon[0]}
                                 </Text>
                                 <Text style={styles.setsDash}>-</Text>
                                 <Text style={[
                                     styles.setsWonNumber,
-                                    setsWon[1] > setsWon[0] && styles.winnerScore
+                                    showWinner2 && styles.winnerScore
                                 ]}>
                                     {setsWon[1]}
                                 </Text>
@@ -109,8 +169,8 @@ export default function MatchHeroV2({ data }: MatchHeroV2Props) {
                                 </View>
                             )}
 
-                            {/* Status */}
-                            {isCompleted && (
+                            {/* Status: finalizado (solo si no es retirada/walkover, que ya está arriba) */}
+                            {isCompleted && !isRetirementOrWalkover && (
                                 <Text style={styles.statusText}>FINALIZADO</Text>
                             )}
                         </View>
@@ -119,7 +179,7 @@ export default function MatchHeroV2({ data }: MatchHeroV2Props) {
 
                 {/* Player 2 */}
                 <View style={styles.playerColumn}>
-                    <PlayerLogo logoUrl={player2.logo_url} size={72} />
+                    <PlayerLogo logoUrl={player2.logo_url ?? undefined} size={72} />
                     <View style={styles.playerInfo}>
                         {player2.country && (
                             <Text style={styles.flag}>{getCountryFlag(player2.country)}</Text>
@@ -127,7 +187,7 @@ export default function MatchHeroV2({ data }: MatchHeroV2Props) {
                         <Text 
                             style={[
                                 styles.playerName,
-                                winner === 2 && styles.winnerName
+                                showWinner2 && styles.winnerName
                             ]} 
                             numberOfLines={2}
                         >
@@ -140,18 +200,89 @@ export default function MatchHeroV2({ data }: MatchHeroV2Props) {
                 </View>
             </View>
 
-            {/* Set Scores - Solo si el partido ha empezado */}
-            {!isPending && sets.length > 0 && (
-                <View style={styles.setsSection}>
-                    {sets.map((set, idx) => (
-                        <SetScoreBox 
-                            key={idx} 
-                            set={set} 
-                            isCurrentSet={isLive && idx === sets.length - 1}
-                        />
-                    ))}
+            {/* Resumen de juegos por set cuando el partido está finalizado (o en vivo) */}
+            {!isPending && scores?.sets && scores.sets.length > 0 && (
+                <View style={styles.setsSummarySection}>
+                    <View style={styles.setsSummaryRow}>
+                        <Text style={[styles.setsSummaryName, showWinner1 && styles.winnerName]} numberOfLines={1}>
+                            {getShortName(player1.name)}
+                        </Text>
+                        <View style={styles.setsSummaryGames}>
+                            {scores.sets.map((set, idx) => {
+                                const pts = set.tiebreak_score ? parseTiebreakPoints(set.tiebreak_score) : null;
+                                const tbSup = pts ? pts[0] : null; // API envía tiebreak como jugador1-jugador2
+                                const completed = isSetCompleted(set.player1_games, set.player2_games);
+                                const showP1Winner = completed && set.winner === 1;
+                                return (
+                                    <View key={idx} style={[styles.setsSummaryCell, showP1Winner && styles.setsSummaryCellWinner]}>
+                                        <View style={styles.setsSummaryValueRow}>
+                                            <Text style={[styles.setsSummaryValue, showP1Winner && styles.setsSummaryValueWinner]}>
+                                                {set.player1_games}
+                                            </Text>
+                                            {tbSup != null && (
+                                                <Text style={[styles.setsSummaryTiebreakSup, showP1Winner && styles.setsSummaryValueWinner]}>
+                                                    {tbSup}
+                                                </Text>
+                                            )}
+                                        </View>
+                                    </View>
+                                );
+                            })}
+                        </View>
+                    </View>
+                    <View style={styles.setsSummaryRow}>
+                        <Text style={[styles.setsSummaryName, showWinner2 && styles.winnerName]} numberOfLines={1}>
+                            {getShortName(player2.name)}
+                        </Text>
+                        <View style={styles.setsSummaryGames}>
+                            {scores.sets.map((set, idx) => {
+                                const pts = set.tiebreak_score ? parseTiebreakPoints(set.tiebreak_score) : null;
+                                const tbSup = pts ? pts[1] : null; // API envía tiebreak como jugador1-jugador2
+                                const completed = isSetCompleted(set.player1_games, set.player2_games);
+                                const showP2Winner = completed && set.winner === 2;
+                                return (
+                                    <View key={idx} style={[styles.setsSummaryCell, showP2Winner && styles.setsSummaryCellWinner]}>
+                                        <View style={styles.setsSummaryValueRow}>
+                                            <Text style={[styles.setsSummaryValue, showP2Winner && styles.setsSummaryValueWinner]}>
+                                                {set.player2_games}
+                                            </Text>
+                                            {tbSup != null && (
+                                                <Text style={[styles.setsSummaryTiebreakSup, showP2Winner && styles.setsSummaryValueWinner]}>
+                                                    {tbSup}
+                                                </Text>
+                                            )}
+                                        </View>
+                                    </View>
+                                );
+                            })}
+                        </View>
+                    </View>
                 </View>
             )}
+
+            {/* En directo: set actual, juegos del set y puntos del juego */}
+            {isLive && live && scores?.sets && scores.sets.length > 0 && (() => {
+                const currentSetIndex = scores.sets.length - 1;
+                const currentSet = scores.sets[currentSetIndex];
+                const setLabel = `Set ${live.current_set}`;
+                const gamesInSet = `${currentSet.player1_games} - ${currentSet.player2_games}`;
+                const pointsLabel = live.is_tiebreak ? 'Puntos tiebreak' : 'Puntos';
+                return (
+                    <View style={styles.liveContextSection}>
+                        <View style={styles.liveContextRow}>
+                            <View style={styles.liveContextBadge}>
+                                <Text style={styles.liveContextBadgeText}>{setLabel}</Text>
+                            </View>
+                            <Text style={styles.liveContextLabel}>Juegos</Text>
+                            <Text style={styles.liveContextGames}>{gamesInSet}</Text>
+                        </View>
+                        <View style={[styles.liveContextRow, styles.liveContextRowPoints]}>
+                            <Text style={styles.liveContextLabel}>{pointsLabel}</Text>
+                            <Text style={styles.liveContextPoints}>{live.current_game}</Text>
+                        </View>
+                    </View>
+                );
+            })()}
 
             {/* Server Indicator */}
             {isLive && live && (
@@ -166,48 +297,6 @@ export default function MatchHeroV2({ data }: MatchHeroV2Props) {
                         </View>
                     )}
                 </View>
-            )}
-        </View>
-    );
-}
-
-// ============================================================
-// SET SCORE BOX
-// ============================================================
-
-interface SetScoreBoxProps {
-    set: SetScore;
-    isCurrentSet?: boolean;
-}
-
-function SetScoreBox({ set, isCurrentSet }: SetScoreBoxProps) {
-    const p1Won = set.winner === 1;
-    const p2Won = set.winner === 2;
-    const hasTiebreak = !!set.tiebreak_score;
-
-    return (
-        <View style={[
-            styles.setBox,
-            isCurrentSet && styles.setBoxCurrent
-        ]}>
-            <Text style={styles.setLabel}>S{set.set_number}</Text>
-            <View style={styles.setScores}>
-                <Text style={[
-                    styles.setScoreNum,
-                    p1Won && styles.setScoreWinner
-                ]}>
-                    {set.player1_games}
-                </Text>
-                <Text style={styles.setScoreDash}>-</Text>
-                <Text style={[
-                    styles.setScoreNum,
-                    p2Won && styles.setScoreWinner
-                ]}>
-                    {set.player2_games}
-                </Text>
-            </View>
-            {hasTiebreak && (
-                <Text style={styles.tiebreakScore}>({set.tiebreak_score})</Text>
             )}
         </View>
     );
@@ -232,12 +321,18 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         marginBottom: 20,
     },
+    tournamentRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 12,
+        marginBottom: 8,
+    },
     tournamentName: {
         fontSize: 18,
         fontWeight: '700',
         color: COLORS.textPrimary,
         textAlign: 'center',
-        marginBottom: 8,
     },
     metaRow: {
         flexDirection: 'row',
@@ -316,6 +411,14 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: 8,
     },
+    reasonText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: COLORS.warning,
+        letterSpacing: 0.5,
+        textAlign: 'center',
+        marginBottom: 4,
+    },
     setsWonRow: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -357,56 +460,121 @@ const styles = StyleSheet.create({
         marginTop: 4,
     },
 
-    // Sets Section
-    setsSection: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        gap: 8,
-        paddingHorizontal: 20,
-        marginBottom: 12,
-    },
-    setBox: {
+    // Resumen de juegos por set (finalizado / en vivo)
+    setsSummarySection: {
+        marginTop: 16,
+        marginHorizontal: 20,
+        paddingVertical: 12,
+        paddingHorizontal: 12,
         backgroundColor: COLORS.background,
         borderRadius: 8,
-        padding: 8,
-        alignItems: 'center',
-        minWidth: 56,
         borderWidth: 1,
         borderColor: COLORS.border,
     },
-    setBoxCurrent: {
-        borderColor: COLORS.primary,
-        backgroundColor: COLORS.primary + '10',
-    },
-    setLabel: {
-        fontSize: 10,
-        fontWeight: '600',
-        color: COLORS.textSecondary,
-        marginBottom: 4,
-    },
-    setScores: {
+    setsSummaryRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 4,
+        marginBottom: 6,
     },
-    setScoreNum: {
-        fontSize: 18,
+    setsSummaryName: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: COLORS.textPrimary,
+        minWidth: 80,
+    },
+    setsSummaryGames: {
+        flex: 1,
+        flexDirection: 'row',
+        gap: 8,
+        justifyContent: 'flex-end',
+    },
+    setsSummaryCell: {
+        minWidth: 28,
+        alignItems: 'center',
+        paddingVertical: 4,
+        paddingHorizontal: 6,
+        borderRadius: 4,
+        backgroundColor: COLORS.border + '40',
+    },
+    setsSummaryCellWinner: {
+        backgroundColor: COLORS.success + '25',
+    },
+    setsSummaryValue: {
+        fontSize: 14,
         fontWeight: '700',
         color: COLORS.textSecondary,
         fontVariant: ['tabular-nums'],
     },
-    setScoreWinner: {
-        color: COLORS.textPrimary,
+    setsSummaryValueWinner: {
+        color: COLORS.success,
     },
-    setScoreDash: {
-        fontSize: 14,
+    setsSummaryValueRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        justifyContent: 'center',
+    },
+    setsSummaryTiebreakSup: {
+        fontSize: 9,
+        fontWeight: '700',
         color: COLORS.textSecondary,
+        marginLeft: 2,
+        marginTop: -4,
+        lineHeight: 12,
+        fontVariant: ['tabular-nums'],
     },
-    tiebreakScore: {
-        fontSize: 10,
+
+    // En directo: set, juegos del set, puntos del juego
+    liveContextSection: {
+        marginTop: 12,
+        marginHorizontal: 20,
+        paddingVertical: 12,
+        paddingHorizontal: 14,
+        backgroundColor: COLORS.primary + '12',
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: COLORS.primary + '30',
+    },
+    liveContextRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    liveContextRowPoints: {
+        marginTop: 10,
+        paddingTop: 10,
+        borderTopWidth: 1,
+        borderTopColor: COLORS.border,
+    },
+    liveContextBadge: {
+        backgroundColor: COLORS.primary,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 6,
+    },
+    liveContextBadgeText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#FFF',
+        fontVariant: ['tabular-nums'],
+    },
+    liveContextLabel: {
+        fontSize: 12,
         fontWeight: '600',
         color: COLORS.textSecondary,
-        marginTop: 2,
+    },
+    liveContextGames: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: COLORS.textPrimary,
+        fontVariant: ['tabular-nums'],
+        marginLeft: 'auto',
+    },
+    liveContextPoints: {
+        fontSize: 20,
+        fontWeight: '800',
+        color: COLORS.primary,
+        fontVariant: ['tabular-nums'],
+        marginLeft: 'auto',
     },
 
     // Server Indicator

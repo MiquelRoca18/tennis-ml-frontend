@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   RefreshControl,
@@ -12,20 +12,24 @@ import LoadingSpinner from '../../components/common/LoadingSpinner';
 import ConfidenceFilter from '../../components/match/ConfidenceFilter';
 import DateSelector from '../../components/match/DateSelector';
 import MatchCard from '../../components/match/MatchCard';
+import StatusFilterTabs, { StatusFilterValue } from '../../components/match/StatusFilterTabs';
 import TournamentSection from '../../components/match/TournamentSection';
+import { useFavoritesRefresh } from '../../src/contexts/FavoritesRefreshContext';
 import { useSmartAutoRefresh } from '../../src/hooks/useAutoRefresh';
 import { fetchMatches } from '../../src/services/api/matchService';
 import { ConfidenceLevel, Match } from '../../src/types/api';
 import { COLORS } from '../../src/utils/constants';
-import { formatDateLong, getDateRange, getTodayDate } from '../../src/utils/dateUtils';
+import { formatDateLong, getDateRange, getTodayDate, isMatchStarted } from '../../src/utils/dateUtils';
 
 export default function MatchFeedScreen() {
   const router = useRouter();
+  const { incrementRefresh } = useFavoritesRefresh();
   const [matches, setMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>(getTodayDate());
+  const [statusFilter, setStatusFilter] = useState<StatusFilterValue>('ALL');
   const [confidenceFilter, setConfidenceFilter] = useState<'ALL' | ConfidenceLevel>('ALL');
   const [matchesSummary, setMatchesSummary] = useState<any>(null);
 
@@ -58,15 +62,34 @@ export default function MatchFeedScreen() {
     loadMatches(selectedDate);
   }, [selectedDate, loadMatches]);
 
-  // Check if there are live matches
+  // Solo considerar "en vivo" si el partido ha empezado (fecha+hora en el pasado)
   const hasLiveMatches = useMemo(() => {
-    return matches.some(match => match.estado === 'en_juego' || match.is_live);
+    return matches.some(match => {
+      const backendSaysLive = match.estado === 'en_juego' || Boolean(match.is_live);
+      const hasStarted = isMatchStarted(match.fecha_partido, match.hora_inicio);
+      return backendSaysLive && hasStarted;
+    });
   }, [matches]);
 
-  // Auto-refresh: 15s for live matches, 60s for pending
-  useSmartAutoRefresh(hasLiveMatches, () => {
+  // Partidos cuya hora ya pasó pero el listado aún los marca pendiente → refrescar cada 15s para pillar el cambio a "en directo"
+  const hasMatchesThatMayHaveJustStarted = useMemo(() => {
+    return matches.some(match => {
+      const hasStarted = isMatchStarted(match.fecha_partido, match.hora_inicio);
+      return hasStarted && match.estado === 'pendiente';
+    });
+  }, [matches]);
+
+  // Auto-refresh: 15s si hay en vivo O si hay partidos que ya deberían haber empezado (para que la card pase a EN VIVO pronto)
+  useSmartAutoRefresh(hasLiveMatches || hasMatchesThatMayHaveJustStarted, () => {
     loadMatches(selectedDate);
   });
+
+  // Refrescar estado de favoritos al volver a esta pestaña (ej. si se quitó un favorito desde la vista Favoritos)
+  useFocusEffect(
+    useCallback(() => {
+      incrementRefresh();
+    }, [incrementRefresh])
+  );
 
   // Handle date selection
   const handleDateSelect = (date: string) => {
@@ -85,11 +108,34 @@ export default function MatchFeedScreen() {
     });
   };
 
-  // Group matches by tournament
+  // Filter by status (Todos, Finalizados, Por jugar, En directo)
+  const statusFilteredMatches = useMemo(() => {
+    if (statusFilter === 'ALL') return matches;
+    return matches.filter(m => m.estado === statusFilter);
+  }, [matches, statusFilter]);
+
+  // Status counts for tabs
+  const statusCounts = useMemo(() => ({
+    all: matches.length,
+    completado: matches.filter(m => m.estado === 'completado').length,
+    pendiente: matches.filter(m => m.estado === 'pendiente').length,
+    en_juego: matches.filter(m => m.estado === 'en_juego').length,
+  }), [matches]);
+
+  // Filter by confidence (applied after status filter)
+  const filteredMatches = useMemo(() => {
+    if (confidenceFilter === 'ALL') return statusFilteredMatches;
+    return statusFilteredMatches.filter(match => {
+      const level = match.prediccion?.confidence_level;
+      return level === confidenceFilter;
+    });
+  }, [statusFilteredMatches, confidenceFilter]);
+
+  // Group matches by tournament (from filtered list)
   const matchesByTournament = useMemo(() => {
     const grouped = new Map<string, Match[]>();
 
-    matches.forEach((match) => {
+    filteredMatches.forEach((match) => {
       const tournamentKey = `${match.torneo || 'Sin Torneo'}_${match.superficie}`;
       if (!grouped.has(tournamentKey)) {
         grouped.set(tournamentKey, []);
@@ -112,33 +158,24 @@ export default function MatchFeedScreen() {
     });
 
     return grouped;
-  }, [matches]);
+  }, [filteredMatches]);
 
-  // Filter matches by confidence level
-  const filteredMatches = useMemo(() => {
-    if (confidenceFilter === 'ALL') return matches;
-    return matches.filter(match => {
-      const level = match.prediccion?.confidence_level;
-      return level === confidenceFilter;
-    });
-  }, [matches, confidenceFilter]);
-
-  // Calculate confidence counts
+  // Calculate confidence counts (from status-filtered list)
   const confidenceCounts = useMemo(() => {
-    const counts = { all: matches.length, HIGH: 0, MEDIUM: 0, LOW: 0 };
-    matches.forEach(match => {
+    const counts = { all: statusFilteredMatches.length, HIGH: 0, MEDIUM: 0, LOW: 0 };
+    statusFilteredMatches.forEach(match => {
       const level = match.prediccion?.confidence_level;
       if (level === 'HIGH') counts.HIGH++;
       else if (level === 'MEDIUM') counts.MEDIUM++;
       else if (level === 'LOW') counts.LOW++;
     });
     return counts;
-  }, [matches]);
+  }, [statusFilteredMatches]);
 
-  // Check if any match has confidence data
+  // Check if any match has confidence data (in status-filtered list)
   const hasConfidenceData = useMemo(() => {
-    return matches.some(m => m.prediccion?.confidence_level);
-  }, [matches]);
+    return statusFilteredMatches.some(m => m.prediccion?.confidence_level);
+  }, [statusFilteredMatches]);
 
   // Render match card
   const renderMatch = (match: Match) => (
@@ -146,15 +183,20 @@ export default function MatchFeedScreen() {
   );
 
   // Empty state
-  const renderEmptyState = () => (
-    <View style={styles.emptyContainer}>
-      <Text style={styles.emptyIcon}>🎾</Text>
-      <Text style={styles.emptyTitle}>No hay partidos disponibles</Text>
-      <Text style={styles.emptyText}>
-        Selecciona otra fecha para ver más partidos
-      </Text>
-    </View>
-  );
+  const renderEmptyState = () => {
+    const statusLabel = statusFilter === 'ALL' ? '' : statusFilter === 'completado' ? ' finalizados' : statusFilter === 'pendiente' ? ' por jugar' : ' en directo';
+    return (
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyIcon}>🎾</Text>
+        <Text style={styles.emptyTitle}>
+          No hay partidos{statusLabel} para este día
+        </Text>
+        <Text style={styles.emptyText}>
+          {statusFilter !== 'ALL' ? 'Prueba otro filtro o ' : ''}Selecciona otra fecha para ver más partidos
+        </Text>
+      </View>
+    );
+  };
 
   // Loading state
   if (loading && !refreshing) {
@@ -207,6 +249,13 @@ export default function MatchFeedScreen() {
         onDateSelect={handleDateSelect}
       />
 
+      {/* Status Filter Tabs: Todos, Finalizados, Por jugar, En directo */}
+      <StatusFilterTabs
+        selectedFilter={statusFilter}
+        onFilterChange={setStatusFilter}
+        counts={statusCounts}
+      />
+
       {/* Confidence Filter - Only show if we have confidence data */}
       {hasConfidenceData && (
         <ConfidenceFilter
@@ -221,7 +270,7 @@ export default function MatchFeedScreen() {
         <View style={styles.summaryBar}>
           <Text style={styles.summaryText}>
             {filteredMatches.length} {filteredMatches.length === 1 ? 'partido' : 'partidos'}
-            {confidenceFilter !== 'ALL' && ` (filtrado)`}
+            {(statusFilter !== 'ALL' || confidenceFilter !== 'ALL') && ` (filtrado)`}
           </Text>
           {filteredMatches.filter(m => m.estado === 'en_juego').length > 0 && (
             <Text style={styles.liveIndicator}>
@@ -248,13 +297,9 @@ export default function MatchFeedScreen() {
         ) : (
           Array.from(matchesByTournament.entries()).map(([tournamentKey, tournamentMatches]) => {
             const [tournamentName, surface] = tournamentKey.split('_');
+            const filteredTournamentMatches = tournamentMatches;
 
-            // Filter tournament matches by confidence
-            const filteredTournamentMatches = confidenceFilter === 'ALL'
-              ? tournamentMatches
-              : tournamentMatches.filter(m => m.prediccion?.confidence_level === confidenceFilter);
-
-            // Skip tournament if no matches after filtering
+            // Skip tournament if no matches (already filtered by status + confidence)
             if (filteredTournamentMatches.length === 0) return null;
 
             const hasLiveMatches = filteredTournamentMatches.some(m => m.estado === 'en_juego');

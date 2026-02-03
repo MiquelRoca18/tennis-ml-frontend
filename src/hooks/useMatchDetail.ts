@@ -19,7 +19,7 @@ interface UseMatchDetailResult {
 }
 
 interface UseMatchDetailOptions {
-    /** Auto-refresh para partidos en vivo (ms). Default: 60000 (1 min) */
+    /** Auto-refresh para partidos en vivo (ms). Default: 10000 (10 s) para reducir retraso respecto al resultado real */
     liveRefreshInterval?: number;
     /** Habilitar auto-refresh */
     enableAutoRefresh?: boolean;
@@ -37,7 +37,7 @@ export function useMatchDetail(
     options: UseMatchDetailOptions = {}
 ): UseMatchDetailResult {
     const {
-        liveRefreshInterval = 60000,
+        liveRefreshInterval = 10000,
         enableAutoRefresh = true,
     } = options;
 
@@ -56,6 +56,10 @@ export function useMatchDetail(
         try {
             setError(null);
             const response = await fetchMatchFull(matchId);
+            // DEBUG: Ver si full trae stats/timeline
+            if (__DEV__ && response) {
+                console.log('[useMatchDetail] /full response - stats:', !!response.stats, 'has_detailed_stats:', response.stats?.has_detailed_stats, 'timeline:', !!response.timeline, 'sets:', response.timeline?.sets?.length);
+            }
             setData(response);
         } catch (err: any) {
             console.error('Error loading match detail:', err);

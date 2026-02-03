@@ -1,13 +1,16 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
     StyleSheet,
+    TouchableOpacity,
     View
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { MatchDetailV2 } from '../../components/match/detail/v2';
 import { COLORS } from '../../src/utils/constants';
 
 export default function MatchDetailScreen() {
+    const router = useRouter();
     const params = useLocalSearchParams();
     const [matchId, setMatchId] = useState<number | null>(null);
     const [matchTitle, setMatchTitle] = useState<string>('Partido');
@@ -33,6 +36,16 @@ export default function MatchDetailScreen() {
                     title: matchTitle,
                     headerShown: true,
                     headerBackTitle: 'Volver',
+                    headerBackVisible: false,
+                    headerLeft: () => (
+                        <TouchableOpacity
+                            onPress={() => router.back()}
+                            style={{ marginLeft: 8, padding: 8 }}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
+                            <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
+                        </TouchableOpacity>
+                    ),
                     headerStyle: {
                         backgroundColor: COLORS.surface,
                     },

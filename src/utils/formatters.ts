@@ -1,4 +1,5 @@
 import { MatchState } from '../types/api';
+import { parseLocalDate } from './dateUtils';
 
 /**
  * Format date to Spanish locale
@@ -6,7 +7,7 @@ import { MatchState } from '../types/api';
  * @returns Formatted date (e.g., "12 Ene 2026")
  */
 export const formatDate = (dateString: string): string => {
-    const date = new Date(dateString);
+    const date = parseLocalDate(dateString);
     const options: Intl.DateTimeFormatOptions = {
         day: 'numeric',
         month: 'short',
@@ -42,7 +43,7 @@ export const formatMatchTime = (fecha: string, hora: string | null): string => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const matchDate = new Date(fecha + 'T00:00:00');
+    const matchDate = parseLocalDate(fecha);
     matchDate.setHours(0, 0, 0, 0);
 
     const diffTime = matchDate.getTime() - today.getTime();
@@ -75,8 +76,11 @@ export const formatPercentage = (value: number): string => {
  * @param value - Decimal value (e.g., 0.673 for 67.3%)
  * @returns Formatted percentage (e.g., "67.3%")
  */
-export const formatProbability = (value: number): string => {
-    return `${(value * 100).toFixed(1)}%`;
+export const formatProbability = (value: number | null | undefined): string => {
+    if (value == null || typeof value !== 'number') return '—';
+    // Aceptar tanto 0-1 (0.58) como 0-100 (58)
+    const pct = value <= 1 ? value * 100 : value;
+    return `${Math.min(100, Math.max(0, pct)).toFixed(1)}%`;
 };
 
 /**
@@ -106,7 +110,7 @@ export const getRelativeDate = (dateString: string): string => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const date = new Date(dateString);
+    const date = parseLocalDate(dateString);
     date.setHours(0, 0, 0, 0);
 
     const diffTime = date.getTime() - today.getTime();

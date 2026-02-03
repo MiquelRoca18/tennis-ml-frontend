@@ -4,15 +4,14 @@
  * 
  * Componente principal que integra:
  * - MatchHeroV2: Cabecera con score
- * - Tabs de navegación: Overview, Stats, Timeline, H2H
+ * - Tabs de navegación: Overview, Stats, H2H
  * 
- * Usa el nuevo endpoint /v2/matches/{id}/full para obtener
- * todos los datos en una sola llamada.
+ * Scroll unificado: toda la pantalla hace scroll (hero, tabs y contenido).
+ * Usa el nuevo endpoint /v2/matches/{id}/full para obtener todos los datos.
  */
 
-import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
-import React from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useMatchDetail } from '../../../../src/hooks/useMatchDetail';
 import { COLORS } from '../../../../src/utils/constants';
 import MatchHeroV2 from './MatchHeroV2';
@@ -21,9 +20,8 @@ import OddsTabV2 from './tabs/OddsTabV2';
 import OverviewTabV2 from './tabs/OverviewTabV2';
 import PredictionTabV2 from './tabs/PredictionTabV2';
 import StatsTabV2 from './tabs/StatsTabV2';
-import TimelineTabV2 from './tabs/TimelineTabV2';
 
-const Tab = createMaterialTopTabNavigator();
+type TabId = 'Overview' | 'Prediction' | 'Odds' | 'Stats' | 'H2H';
 
 interface MatchDetailV2Props {
     matchId: number;
@@ -31,6 +29,7 @@ interface MatchDetailV2Props {
 
 export default function MatchDetailV2({ matchId }: MatchDetailV2Props) {
     const { data, loading, error, refresh, isLive } = useMatchDetail(matchId);
+    const [activeTab, setActiveTab] = useState<TabId>('Overview');
 
     // Loading State
     if (loading && !data) {
@@ -74,12 +73,35 @@ export default function MatchDetailV2({ matchId }: MatchDetailV2Props) {
         );
     }
 
-    // Mostrar tabs siempre (cada una maneja su estado vacío)
     const isPending = data.match.status === 'pendiente';
-    const isCompleted = data.match.status === 'completado';
+
+    const tabs: { id: TabId; label: string }[] = [
+        { id: 'Overview', label: 'RESUMEN' },
+        ...(isPending ? [{ id: 'Prediction' as TabId, label: 'PREDICCIÓN' }, { id: 'Odds' as TabId, label: 'CUOTAS' }] : []),
+        ...(!isPending ? [{ id: 'Stats' as TabId, label: 'STATS' }] : []),
+        { id: 'H2H', label: 'H2H' },
+    ];
+
+    const renderTabContent = () => {
+        switch (activeTab) {
+            case 'Overview': return <OverviewTabV2 data={data} scrollable={false} />;
+            case 'Prediction': return <PredictionTabV2 data={data} scrollable={false} />;
+            case 'Odds': return <OddsTabV2 data={data} scrollable={false} />;
+            case 'Stats': return <StatsTabV2 data={data} scrollable={false} />;
+            case 'H2H': return <H2HTabV2 data={data} scrollable={false} />;
+            default: return <OverviewTabV2 data={data} scrollable={false} />;
+        }
+    };
 
     return (
-        <View style={styles.container}>
+        <ScrollView
+            style={styles.container}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={true}
+            refreshControl={
+                <RefreshControl refreshing={loading} onRefresh={refresh} tintColor={COLORS.primary} />
+            }
+        >
             {/* Hero Section */}
             <MatchHeroV2 data={data} />
 
@@ -87,80 +109,32 @@ export default function MatchDetailV2({ matchId }: MatchDetailV2Props) {
             {isLive && (
                 <View style={styles.liveRefreshIndicator}>
                     <View style={styles.liveDot} />
-                    <Text style={styles.liveRefreshText}>
-                        Actualizando automáticamente
-                    </Text>
+                    <Text style={styles.liveRefreshText}>Actualizando automáticamente</Text>
                 </View>
             )}
 
-            {/* Tabs - Diferentes según estado del partido */}
-            <Tab.Navigator
-                screenOptions={{
-                    tabBarScrollEnabled: true,
-                    tabBarActiveTintColor: COLORS.primary,
-                    tabBarInactiveTintColor: COLORS.textSecondary,
-                    tabBarIndicatorStyle: styles.tabIndicator,
-                    tabBarStyle: styles.tabBar,
-                    tabBarLabelStyle: styles.tabLabel,
-                    tabBarItemStyle: styles.tabItem,
-                    swipeEnabled: true,
-                }}
-            >
-                {/* Overview - siempre visible */}
-                <Tab.Screen 
-                    name="Overview" 
-                    options={{ tabBarLabel: 'RESUMEN' }}
-                >
-                    {() => <OverviewTabV2 data={data} />}
-                </Tab.Screen>
-
-                {/* ===== TABS PARA PARTIDOS PENDIENTES ===== */}
-                {isPending && (
-                    <Tab.Screen 
-                        name="Prediction" 
-                        options={{ tabBarLabel: 'PREDICCIÓN' }}
+            {/* Custom Tabs */}
+            <View style={styles.tabBar}>
+                {tabs.map(tab => (
+                    <TouchableOpacity
+                        key={tab.id}
+                        style={[styles.tabItem, activeTab === tab.id && styles.tabItemActive]}
+                        onPress={() => setActiveTab(tab.id)}
                     >
-                        {() => <PredictionTabV2 data={data} />}
-                    </Tab.Screen>
-                )}
-
-                {isPending && (
-                    <Tab.Screen 
-                        name="Odds" 
-                        options={{ tabBarLabel: 'CUOTAS' }}
-                    >
-                        {() => <OddsTabV2 data={data} />}
-                    </Tab.Screen>
-                )}
-
-                {/* ===== TABS PARA PARTIDOS EN JUEGO/COMPLETADOS ===== */}
-                {!isPending && (
-                    <Tab.Screen 
-                        name="Stats" 
-                        options={{ tabBarLabel: 'STATS' }}
-                    >
-                        {() => <StatsTabV2 data={data} />}
-                    </Tab.Screen>
-                )}
-
-                {!isPending && (
-                    <Tab.Screen 
-                        name="Timeline" 
-                        options={{ tabBarLabel: 'TIMELINE' }}
-                    >
-                        {() => <TimelineTabV2 data={data} />}
-                    </Tab.Screen>
-                )}
-
-                {/* H2H - siempre visible */}
-                <Tab.Screen 
-                    name="H2H" 
-                    options={{ tabBarLabel: 'H2H' }}
-                >
-                    {() => <H2HTabV2 data={data} />}
-                </Tab.Screen>
-            </Tab.Navigator>
-        </View>
+                        <Text style={[
+                            styles.tabLabel,
+                            activeTab === tab.id && styles.tabLabelActive
+                        ]}>
+                            {tab.label}
+                        </Text>
+                    </TouchableOpacity>
+                ))}
+            </View>
+            {/* Tab Content */}
+            <View style={styles.tabContent}>
+                {renderTabContent()}
+            </View>
+        </ScrollView>
     );
 }
 
@@ -233,28 +207,38 @@ const styles = StyleSheet.create({
         color: COLORS.success,
     },
 
-    // Tab Bar
+    scrollContent: {
+        paddingBottom: 40,
+    },
     tabBar: {
+        flexDirection: 'row',
         backgroundColor: COLORS.surface,
         borderBottomWidth: 1,
         borderBottomColor: COLORS.border,
-        elevation: 0,
-        shadowOpacity: 0,
+        paddingHorizontal: 8,
     },
-    tabIndicator: {
-        backgroundColor: COLORS.primary,
-        height: 3,
-        borderRadius: 2,
+    tabItem: {
+        flex: 1,
+        paddingVertical: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    tabItemActive: {
+        borderBottomWidth: 3,
+        borderBottomColor: COLORS.primary,
+        marginBottom: -1,
     },
     tabLabel: {
         fontSize: 12,
         fontWeight: '700',
         letterSpacing: 0.5,
         textTransform: 'uppercase',
+        color: COLORS.textSecondary,
     },
-    tabItem: {
-        width: 'auto',
-        minWidth: 90,
-        paddingHorizontal: 16,
+    tabLabelActive: {
+        color: COLORS.primary,
+    },
+    tabContent: {
+        minHeight: 400,
     },
 });

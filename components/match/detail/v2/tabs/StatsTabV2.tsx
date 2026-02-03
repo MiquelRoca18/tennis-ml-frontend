@@ -14,11 +14,13 @@ import { COLORS } from '../../../../../src/utils/constants';
 
 interface StatsTabV2Props {
     data: MatchFullResponse;
+    /** Si false, el contenido no usa ScrollView propio (scroll unificado en padre) */
+    scrollable?: boolean;
 }
 
-type StatsCategory = 'general' | 'serve' | 'return' | 'breakpoints';
+type StatsCategory = 'general' | 'serve' | 'return' | 'breakpoints' | 'points';
 
-export default function StatsTabV2({ data }: StatsTabV2Props) {
+export default function StatsTabV2({ data, scrollable = true }: StatsTabV2Props) {
     const [stats, setStats] = useState<MatchStats | null>(data.stats || null);
     const [loading, setLoading] = useState(!data.stats?.has_detailed_stats);
     const [error, setError] = useState<string | null>(null);
@@ -45,10 +47,15 @@ export default function StatsTabV2({ data }: StatsTabV2Props) {
             setLoading(true);
             setError(null);
             const response = await apiClient.get<MatchStats>(`/v2/matches/${data.match.id}/stats`);
+            // DEBUG: Ver qué devuelve la API
+            if (__DEV__) {
+                console.log('[StatsTabV2] API /v2/matches/' + data.match.id + '/stats response:', JSON.stringify(response.data, null, 2));
+                console.log('[StatsTabV2] has_detailed_stats:', response.data?.has_detailed_stats);
+            }
             setStats(response.data);
-        } catch (err) {
+        } catch (err: any) {
             setError('Error al cargar estadísticas');
-            console.error('Error loading stats:', err);
+            console.error('[StatsTabV2] Error loading stats:', err?.response?.status, err?.response?.data, err?.message);
         } finally {
             setLoading(false);
         }
@@ -78,10 +85,11 @@ export default function StatsTabV2({ data }: StatsTabV2Props) {
     }
 
     const categories: { id: StatsCategory; label: string; icon: string }[] = [
-        { id: 'general', label: 'General', icon: '📊' },
+        { id: 'general', label: 'Resumen', icon: '📊' },
         { id: 'serve', label: 'Saque', icon: '🎾' },
         { id: 'return', label: 'Resto', icon: '↩️' },
         { id: 'breakpoints', label: 'Break Pts', icon: '🎯' },
+        { id: 'points', label: 'Puntos', icon: '⚡' },
     ];
 
     return (
@@ -109,24 +117,44 @@ export default function StatsTabV2({ data }: StatsTabV2Props) {
             </View>
 
             {/* Stats Content */}
+            {scrollable ? (
             <ScrollView 
                 style={styles.statsScroll}
                 contentContainerStyle={styles.statsContent}
                 showsVerticalScrollIndicator={false}
             >
-                {/* Players Header */}
-                <View style={styles.playersHeader}>
-                    <Text style={[styles.playerName, styles.playerNameP1]}>{p1Short}</Text>
-                    <Text style={styles.playerVs}>vs</Text>
-                    <Text style={[styles.playerName, styles.playerNameP2]}>{p2Short}</Text>
-                </View>
+                <View style={styles.categoryCard}>
+                    {/* Players Header */}
+                    <View style={styles.playersHeader}>
+                        <Text style={[styles.playerName, styles.playerNameP1]}>{p1Short}</Text>
+                        <Text style={styles.playerVs}>vs</Text>
+                        <Text style={[styles.playerName, styles.playerNameP2]}>{p2Short}</Text>
+                    </View>
 
-                {/* Stats by Category */}
-                {category === 'general' && <GeneralStats stats={stats} />}
+                    {/* Stats by Category */}
+                    {category === 'general' && <GeneralStats stats={stats} />}
                 {category === 'serve' && <ServeStats stats={stats} />}
                 {category === 'return' && <ReturnStats stats={stats} />}
                 {category === 'breakpoints' && <BreakPointsStats stats={stats} />}
+                {category === 'points' && <PointsStats stats={stats} />}
+                </View>
             </ScrollView>
+            ) : (
+                <View style={[styles.statsScroll, styles.statsContent]}>
+                    <View style={styles.categoryCard}>
+                        <View style={styles.playersHeader}>
+                            <Text style={[styles.playerName, styles.playerNameP1]}>{p1Short}</Text>
+                            <Text style={styles.playerVs}>vs</Text>
+                            <Text style={[styles.playerName, styles.playerNameP2]}>{p2Short}</Text>
+                        </View>
+                        {category === 'general' && <GeneralStats stats={stats} />}
+                        {category === 'serve' && <ServeStats stats={stats} />}
+                        {category === 'return' && <ReturnStats stats={stats} />}
+                        {category === 'breakpoints' && <BreakPointsStats stats={stats} />}
+                        {category === 'points' && <PointsStats stats={stats} />}
+                    </View>
+                </View>
+            )}
         </View>
     );
 }
@@ -139,12 +167,15 @@ interface StatBarProps {
     label: string;
     v1: number;
     v2: number;
-    format?: 'number' | 'percent' | 'fraction';
+    format?: 'number' | 'percent' | 'fraction' | 'speed';
     t1?: number;
     t2?: number;
+    hideBar?: boolean;
+    /** Si true, destaca como stat principal (tamaño mayor, borde) */
+    primary?: boolean;
 }
 
-function StatBar({ label, v1, v2, format = 'number', t1, t2 }: StatBarProps) {
+function StatBar({ label, v1, v2, format = 'number', t1, t2, hideBar, primary }: StatBarProps) {
     const max = Math.max(v1, v2, 1);
     const pct1 = (v1 / max) * 100;
     const pct2 = (v2 / max) * 100;
@@ -152,6 +183,7 @@ function StatBar({ label, v1, v2, format = 'number', t1, t2 }: StatBarProps) {
 
     const formatValue = (v: number, t?: number) => {
         if (format === 'percent') return `${v}%`;
+        if (format === 'speed') return `${v} km/h`;
         if (format === 'fraction' && t !== undefined) {
             const pct = t > 0 ? Math.round((v / t) * 100) : 0;
             return `${v}/${t} (${pct}%)`;
@@ -160,28 +192,36 @@ function StatBar({ label, v1, v2, format = 'number', t1, t2 }: StatBarProps) {
     };
 
     return (
-        <View style={styles.statRow}>
-            {/* Value P1 */}
+        <View style={[styles.statRow, primary && styles.statRowPrimary]}>
             <View style={styles.statValueContainer}>
-                <Text style={[styles.statValue, winner === 1 && styles.statValueWinner]}>
+                <Text style={[
+                    styles.statValue,
+                    primary && styles.statValuePrimary,
+                    winner === 1 && styles.statValueWinner
+                ]}>
                     {formatValue(v1, t1)}
                 </Text>
             </View>
-
-            {/* Bar */}
             <View style={styles.statBarContainer}>
-                <View style={styles.statBarWrapper}>
-                    <View style={[styles.statBarP1, { width: `${pct1}%` }]} />
-                </View>
-                <Text style={styles.statLabel}>{label}</Text>
-                <View style={styles.statBarWrapper}>
-                    <View style={[styles.statBarP2, { width: `${pct2}%` }]} />
-                </View>
+                {!hideBar && (
+                    <>
+                        <View style={styles.statBarWrapper}>
+                            <View style={[styles.statBarP1, { width: `${pct1}%` }]} />
+                        </View>
+                        <Text style={[styles.statLabel, primary && styles.statLabelPrimary]}>{label}</Text>
+                        <View style={styles.statBarWrapper}>
+                            <View style={[styles.statBarP2, { width: `${pct2}%` }]} />
+                        </View>
+                    </>
+                )}
+                {hideBar && <Text style={[styles.statLabel, primary && styles.statLabelPrimary]}>{label}</Text>}
             </View>
-
-            {/* Value P2 */}
             <View style={styles.statValueContainer}>
-                <Text style={[styles.statValue, winner === 2 && styles.statValueWinner]}>
+                <Text style={[
+                    styles.statValue,
+                    primary && styles.statValuePrimary,
+                    winner === 2 && styles.statValueWinner
+                ]}>
                     {formatValue(v2, t2)}
                 </Text>
             </View>
@@ -199,24 +239,35 @@ function GeneralStats({ stats }: { stats: MatchStats }) {
 
     return (
         <View style={styles.statsSection}>
-            <StatBar 
-                label="Juegos Ganados"
-                v1={p1.total_games_won}
-                v2={p2.total_games_won}
-            />
-            <StatBar 
-                label="Juegos de Saque Ganados"
+            <Text style={styles.sectionHeader}>Resumen del partido</Text>
+            <StatBar label="Puntos" v1={p1.total_points_won} v2={p2.total_points_won} primary />
+            <StatBar label="Juegos" v1={p1.total_games_won} v2={p2.total_games_won} />
+            <StatBar
+                label="Juegos saque"
                 v1={p1.serve.service_games_won}
                 v2={p2.serve.service_games_won}
                 format="fraction"
                 t1={p1.serve.service_games_total}
                 t2={p2.serve.service_games_total}
             />
-            <StatBar 
-                label="Breaks Realizados"
-                v1={p1.return?.return_games_won || 0}
-                v2={p2.return?.return_games_won || 0}
+            <StatBar
+                label="Breaks"
+                v1={p1.return?.return_games_won ?? 0}
+                v2={p2.return?.return_games_won ?? 0}
+                format="fraction"
+                t1={p1.return?.return_games_total}
+                t2={p2.return?.return_games_total}
+                primary
             />
+        </View>
+    );
+}
+
+function StatBlock({ title, children }: { title: string; children: React.ReactNode }) {
+    return (
+        <View style={styles.statBlock}>
+            <Text style={styles.statBlockTitle}>{title}</Text>
+            <View style={styles.statBlockContent}>{children}</View>
         </View>
     );
 }
@@ -227,14 +278,74 @@ function ServeStats({ stats }: { stats: MatchStats }) {
 
     return (
         <View style={styles.statsSection}>
-            <StatBar 
-                label="Juegos de Saque Ganados"
+            <Text style={styles.sectionHeader}>Saque</Text>
+
+            <StatBlock title="Conteos">
+                <StatBar label="Aces" v1={p1.serve.aces} v2={p2.serve.aces} primary />
+                <StatBar label="Dobles faltas" v1={p1.serve.double_faults} v2={p2.serve.double_faults} />
+            </StatBlock>
+
+            <StatBlock title="1er saque">
+                <StatBar
+                    label="% 1er saque"
+                    v1={Math.round(p1.serve.first_serve_pct)}
+                    v2={Math.round(p2.serve.first_serve_pct)}
+                    format="percent"
+                />
+                <StatBar
+                    label="% pts ganados"
+                    v1={Math.round(p1.serve.first_serve_won_pct)}
+                    v2={Math.round(p2.serve.first_serve_won_pct)}
+                    format="percent"
+                />
+            </StatBlock>
+
+            <StatBlock title="2do saque">
+                <StatBar
+                    label="% pts 2do saque"
+                    v1={Math.round(p1.serve.second_serve_won_pct)}
+                    v2={Math.round(p2.serve.second_serve_won_pct)}
+                    format="percent"
+                />
+            </StatBlock>
+
+            <StatBlock title="Puntos y juegos">
+                <StatBar
+                    label="Pts saque"
+                v1={p1.serve.service_points_won ?? 0}
+                v2={p2.serve.service_points_won ?? 0}
+                format="fraction"
+                t1={p1.serve.service_points_total}
+                t2={p2.serve.service_points_total}
+            />
+            <StatBar
+                label="Juegos saque"
                 v1={p1.serve.service_games_won}
                 v2={p2.serve.service_games_won}
                 format="fraction"
                 t1={p1.serve.service_games_total}
                 t2={p2.serve.service_games_total}
             />
+            </StatBlock>
+
+            {((p1.serve.avg_first_serve_speed_kmh ?? 0) > 0 || (p2.serve.avg_first_serve_speed_kmh ?? 0) > 0) && (
+                <StatBlock title="Velocidad">
+                <StatBar
+                    label="1er saque"
+                    v1={p1.serve.avg_first_serve_speed_kmh ?? 0}
+                    v2={p2.serve.avg_first_serve_speed_kmh ?? 0}
+                    format="speed"
+                />
+                {((p1.serve.avg_second_serve_speed_kmh ?? 0) > 0 || (p2.serve.avg_second_serve_speed_kmh ?? 0) > 0) && (
+                    <StatBar
+                        label="2do saque"
+                        v1={p1.serve.avg_second_serve_speed_kmh ?? 0}
+                        v2={p2.serve.avg_second_serve_speed_kmh ?? 0}
+                        format="speed"
+                    />
+                )}
+                </StatBlock>
+            )}
         </View>
     );
 }
@@ -245,11 +356,45 @@ function ReturnStats({ stats }: { stats: MatchStats }) {
 
     return (
         <View style={styles.statsSection}>
-            <StatBar 
-                label="Breaks Realizados"
-                v1={p1.return?.return_games_won || 0}
-                v2={p2.return?.return_games_won || 0}
-            />
+            <Text style={styles.sectionHeader}>Resto</Text>
+
+            <StatBlock title="1er resto">
+                <StatBar
+                    label="% pts ganados"
+                    v1={Math.round(p1.return?.first_return_points_won_pct ?? 0)}
+                    v2={Math.round(p2.return?.first_return_points_won_pct ?? 0)}
+                    format="percent"
+                />
+            </StatBlock>
+
+            <StatBlock title="2do resto">
+                <StatBar
+                    label="% pts ganados"
+                    v1={Math.round(p1.return?.second_return_points_won_pct ?? 0)}
+                    v2={Math.round(p2.return?.second_return_points_won_pct ?? 0)}
+                    format="percent"
+                />
+            </StatBlock>
+
+            <StatBlock title="Puntos y breaks">
+                <StatBar
+                    label="Pts resto"
+                    v1={p1.return?.return_points_won ?? 0}
+                    v2={p2.return?.return_points_won ?? 0}
+                    format="fraction"
+                    t1={p1.return?.return_points_total}
+                    t2={p2.return?.return_points_total}
+                />
+                <StatBar
+                    label="Breaks"
+                    v1={p1.return?.return_games_won ?? 0}
+                    v2={p2.return?.return_games_won ?? 0}
+                    format="fraction"
+                    t1={p1.return?.return_games_total}
+                    t2={p2.return?.return_games_total}
+                    primary
+                />
+            </StatBlock>
         </View>
     );
 }
@@ -260,31 +405,84 @@ function BreakPointsStats({ stats }: { stats: MatchStats }) {
 
     return (
         <View style={styles.statsSection}>
-            {/* Conversión de BP */}
+            <Text style={styles.sectionHeader}>Break Points</Text>
             <View style={styles.subSectionHeader}>
-                <Text style={styles.subSectionTitle}>Conversión de Break Points</Text>
+                <Text style={styles.subSectionTitle}>Conversión</Text>
             </View>
-            <StatBar 
-                label="BP Convertidos"
+            <StatBar
+                label="BP convertidos"
                 v1={p1.break_points.break_points_won}
                 v2={p2.break_points.break_points_won}
                 format="fraction"
                 t1={p1.break_points.break_points_total}
                 t2={p2.break_points.break_points_total}
             />
-            
-            {/* Defensa de BP */}
             <View style={styles.subSectionHeader}>
-                <Text style={styles.subSectionTitle}>Defensa de Break Points</Text>
+                <Text style={styles.subSectionTitle}>Defensa</Text>
             </View>
-            <StatBar 
-                label="BP Salvados"
+            <StatBar
+                label="BP salvados"
                 v1={p1.break_points.break_points_saved}
                 v2={p2.break_points.break_points_saved}
                 format="fraction"
                 t1={p1.break_points.break_points_faced}
                 t2={p2.break_points.break_points_faced}
             />
+        </View>
+    );
+}
+
+function StatCompact({ label, v1, v2 }: { label: string; v1: number; v2: number }) {
+    const winner = v1 > v2 ? 1 : v2 > v1 ? 2 : 0;
+    return (
+        <View style={styles.statCompact}>
+            <Text style={[styles.statCompactValue, winner === 1 && styles.statValueWinner]}>{v1}</Text>
+            <Text style={styles.statCompactLabel}>{label}</Text>
+            <Text style={[styles.statCompactValue, winner === 2 && styles.statValueWinner]}>{v2}</Text>
+        </View>
+    );
+}
+
+function PointsStats({ stats }: { stats: MatchStats }) {
+    const p1 = stats.player1;
+    const p2 = stats.player2;
+    const wue1 = p1.winners - p1.unforced_errors;
+    const wue2 = p2.winners - p2.unforced_errors;
+
+    return (
+        <View style={styles.statsSection}>
+            <Text style={styles.sectionHeader}>Puntos y juego</Text>
+
+            <View style={styles.statGrid}>
+                <StatCompact label="Winners" v1={p1.winners} v2={p2.winners} />
+                <StatCompact label="Errores" v1={p1.unforced_errors} v2={p2.unforced_errors} />
+                <StatCompact label="Winners - UE" v1={wue1} v2={wue2} />
+            </View>
+
+            {((p1.net_points_total ?? 0) > 0 || (p2.net_points_total ?? 0) > 0) && (
+                <StatBar
+                    label="Pts en la red"
+                    v1={p1.net_points_won ?? 0}
+                    v2={p2.net_points_won ?? 0}
+                    format="fraction"
+                    t1={p1.net_points_total}
+                    t2={p2.net_points_total}
+                />
+            )}
+            {(p1.last_10_balls != null || p2.last_10_balls != null) && (
+                <StatBar
+                    label="Últimos 10 pts"
+                    v1={p1.last_10_balls ?? 0}
+                    v2={p2.last_10_balls ?? 0}
+                />
+            )}
+            {((p1.match_points_saved ?? 0) > 0 || (p2.match_points_saved ?? 0) > 0) && (
+                <StatBar
+                    label="Match points salvados"
+                    v1={p1.match_points_saved ?? 0}
+                    v2={p2.match_points_saved ?? 0}
+                />
+            )}
         </View>
     );
 }
@@ -311,12 +509,12 @@ const styles = StyleSheet.create({
         color: COLORS.textSecondary,
     },
 
-    // Category Tabs
+    // Category Tabs - Ocupan todo el ancho disponible
     categoryTabs: {
         flexDirection: 'row',
         backgroundColor: COLORS.surface,
-        paddingVertical: 8,
-        paddingHorizontal: 16,
+        paddingVertical: 10,
+        paddingHorizontal: 4,
         borderBottomWidth: 1,
         borderBottomColor: COLORS.border,
     },
@@ -325,8 +523,8 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 8,
-        paddingHorizontal: 8,
+        paddingVertical: 6,
+        paddingHorizontal: 4,
         borderRadius: 8,
         gap: 4,
     },
@@ -351,7 +549,14 @@ const styles = StyleSheet.create({
     },
     statsContent: {
         padding: 16,
-        paddingBottom: 32,
+        paddingBottom: 40,
+    },
+    categoryCard: {
+        backgroundColor: COLORS.surface,
+        borderRadius: 16,
+        padding: 20,
+        borderWidth: 1,
+        borderColor: COLORS.border,
     },
 
     // Players Header
@@ -359,7 +564,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 20,
+        marginBottom: 24,
         paddingHorizontal: 8,
     },
     playerName: {
@@ -382,27 +587,91 @@ const styles = StyleSheet.create({
         marginHorizontal: 16,
     },
 
-    // Stats Section
+    // Stats Section - Más espacio entre elementos
     statsSection: {
-        gap: 16,
+        gap: 20,
+    },
+    sectionHeader: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: COLORS.textSecondary,
+        marginBottom: 8,
+        marginTop: 8,
+        textTransform: 'uppercase',
+        letterSpacing: 0.8,
     },
     subSectionHeader: {
-        marginTop: 12,
-        marginBottom: 4,
+        marginTop: 20,
+        marginBottom: 8,
     },
     subSectionTitle: {
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: '600',
         color: COLORS.textSecondary,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    statBlock: {
+        marginTop: 16,
+    },
+    statBlockTitle: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: COLORS.textSecondary,
+        textTransform: 'uppercase',
+        letterSpacing: 0.8,
+        marginBottom: 10,
+        paddingLeft: 4,
+    },
+    statBlockContent: {
+        gap: 16,
+    },
+    statGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 12,
+    },
+    statCompact: {
+        flex: 1,
+        minWidth: '47%',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: COLORS.surface,
+        borderRadius: 12,
+        paddingVertical: 12,
+        paddingHorizontal: 14,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+    },
+    statCompactValue: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: COLORS.textSecondary,
+        fontFamily: 'RobotoMono-Regular',
+    },
+    statCompactLabel: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: COLORS.textSecondary,
+        textAlign: 'center',
+        flex: 1,
     },
 
-    // Stat Row
+    // Stat Row - Más padding y separación
     statRow: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: COLORS.surface,
         borderRadius: 12,
-        padding: 12,
+        paddingVertical: 14,
+        paddingHorizontal: 14,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+    },
+    statRowPrimary: {
+        borderColor: COLORS.primary + '50',
+        backgroundColor: COLORS.primary + '08',
     },
     statValueContainer: {
         width: 70,
@@ -412,6 +681,10 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: COLORS.textSecondary,
         textAlign: 'center',
+    },
+    statValuePrimary: {
+        fontSize: 16,
+        fontWeight: '700',
     },
     statValueWinner: {
         color: COLORS.textPrimary,
@@ -423,11 +696,16 @@ const styles = StyleSheet.create({
         paddingHorizontal: 8,
     },
     statLabel: {
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '600',
         color: COLORS.textSecondary,
-        marginVertical: 4,
+        marginVertical: 6,
         textAlign: 'center',
+    },
+    statLabelPrimary: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: COLORS.textPrimary,
     },
     statBarWrapper: {
         width: '100%',

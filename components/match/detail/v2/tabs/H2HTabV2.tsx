@@ -11,9 +11,11 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-nat
 import apiClient from '../../../../../src/services/api/apiClient';
 import { MatchFullResponse, getShortName } from '../../../../../src/types/matchDetail';
 import { COLORS } from '../../../../../src/utils/constants';
+import { parseLocalDate } from '../../../../../src/utils/dateUtils';
 
 interface H2HTabV2Props {
     data: MatchFullResponse;
+    scrollable?: boolean;
 }
 
 interface H2HResponse {
@@ -36,7 +38,7 @@ interface H2HResponse {
     }[];
 }
 
-export default function H2HTabV2({ data }: H2HTabV2Props) {
+export default function H2HTabV2({ data, scrollable = true }: H2HTabV2Props) {
     const [h2hData, setH2hData] = useState<H2HResponse | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -100,12 +102,8 @@ export default function H2HTabV2({ data }: H2HTabV2Props) {
     const h2h = h2hData;
     const surfaceRecords = h2h.surface_records || { Hard: [0, 0], Clay: [0, 0], Grass: [0, 0] };
 
-    return (
-        <ScrollView 
-            style={styles.container}
-            contentContainerStyle={styles.content}
-            showsVerticalScrollIndicator={false}
-        >
+    const content = (
+        <>
             {/* Main Balance */}
             <View style={styles.balanceCard}>
                 <Text style={styles.balanceTitle}>Balance General</Text>
@@ -178,8 +176,17 @@ export default function H2HTabV2({ data }: H2HTabV2Props) {
                     ))}
                 </View>
             )}
-        </ScrollView>
+        </>
     );
+
+    if (scrollable) {
+        return (
+            <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+                {content}
+            </ScrollView>
+        );
+    }
+    return <View style={[styles.container, styles.content]}>{content}</View>;
 }
 
 // ============================================================
@@ -249,7 +256,7 @@ function PreviousMatchRow({ match, p1Name, p2Name }: PreviousMatchRowProps) {
     const winner = match.winner === 1 ? p1Name : p2Name;
 
     const formatDate = (dateStr: string) => {
-        const date = new Date(dateStr);
+        const date = parseLocalDate(dateStr);
         return date.toLocaleDateString('es-ES', { 
             day: 'numeric', 
             month: 'short',

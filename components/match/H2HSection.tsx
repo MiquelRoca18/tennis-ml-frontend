@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { H2HData } from '../../src/types/api';
 import { COLORS } from '../../src/utils/constants';
+import { parseLocalDate } from '../../src/utils/dateUtils';
 
 interface H2HSectionProps {
     h2h: H2HData;
@@ -144,7 +145,7 @@ export default function H2HSection({ h2h, player1Name, player2Name }: H2HSection
                             <View key={index} style={styles.matchRow}>
                                 <View style={styles.matchDate}>
                                     <Text style={styles.matchDateText}>
-                                        {new Date(match.date).toLocaleDateString('es-ES', {
+                                        {parseLocalDate(match.date).toLocaleDateString('es-ES', {
                                             day: '2-digit',
                                             month: '2-digit',
                                             year: '2-digit',

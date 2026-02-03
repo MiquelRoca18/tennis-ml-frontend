@@ -25,11 +25,14 @@ export default function MatchHero({ match, matchDetails }: MatchHeroProps) {
     // Get scores from multiple sources with priority
     const getScore = () => {
         // Priority 1: structured scores from resultado
+        // Solo contar sets COMPLETADOS (winner definido). No contar sets en curso (ej. 3-1).
         if (resultado?.scores?.sets && resultado.scores.sets.length > 0) {
             const sets = resultado.scores.sets;
+            const p1 = sets.filter((s: any) => s.winner === 1).length;
+            const p2 = sets.filter((s: any) => s.winner === 2).length;
             return {
-                player1Sets: sets.filter((s: any) => s.player1_score > s.player2_score).length,
-                player2Sets: sets.filter((s: any) => s.player2_score > s.player1_score).length,
+                player1Sets: p1,
+                player2Sets: p2,
                 sets: sets.map((s: any) => ({
                     jugador1: s.player1_score,
                     jugador2: s.player2_score,
@@ -41,11 +44,18 @@ export default function MatchHero({ match, matchDetails }: MatchHeroProps) {
         }
         
         // Priority 2: matchDetails estadisticas_basicas
+        // Solo contar sets completados (6+ juegos con ventaja de 2, o 7-6)
         if (matchDetails?.estadisticas_basicas?.marcador_por_sets && matchDetails.estadisticas_basicas.marcador_por_sets.length > 0) {
             const sets = matchDetails.estadisticas_basicas.marcador_por_sets;
+            const isSetCompleted = (j1: number, j2: number) => {
+                const [lo, hi] = [Math.min(j1, j2), Math.max(j1, j2)];
+                return hi >= 6 && (hi - lo >= 2 || lo >= 6);
+            };
+            const p1 = sets.filter((s: any) => isSetCompleted(s.jugador1, s.jugador2) && s.jugador1 > s.jugador2).length;
+            const p2 = sets.filter((s: any) => isSetCompleted(s.jugador1, s.jugador2) && s.jugador2 > s.jugador1).length;
             return {
-                player1Sets: sets.filter((s: any) => s.jugador1 > s.jugador2).length,
-                player2Sets: sets.filter((s: any) => s.jugador2 > s.jugador1).length,
+                player1Sets: p1,
+                player2Sets: p2,
                 sets: sets,
                 setsResult: null
             };

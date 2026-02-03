@@ -1,9 +1,12 @@
 import { useRouter } from 'expo-router';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import FavoriteButton from '../ui/FavoriteButton';
+import { useIsFavorite } from '../../src/hooks/useFavorites';
 import { Match } from '../../src/types/api';
 import { COLORS, EV_THRESHOLD_BET, EV_THRESHOLD_MARGINAL } from '../../src/utils/constants';
 import { formatSeed, getCountryFlag } from '../../src/utils/countryUtils';
+import { isMatchStarted } from '../../src/utils/dateUtils';
 import { formatMatchStatus, formatMatchTime, formatOdds, formatPercentage, formatProbability } from '../../src/utils/formatters';
 import CompletedMatchScore from './CompletedMatchScore';
 import ConfidenceBadge from './ConfidenceBadge';
@@ -13,18 +16,45 @@ import PlayerLogo from './PlayerLogo';
 interface MatchCardProps {
     match: Match;
     onPress: () => void;
+    /** Se llama cuando se quita de favoritos (para actualizar la lista en la vista Favoritos) */
+    onFavoriteRemoved?: () => void;
 }
 
-export default function MatchCard({ match, onPress }: MatchCardProps) {
+export default function MatchCard({ match, onPress, onFavoriteRemoved }: MatchCardProps) {
     const router = useRouter();
-    const { jugador1, jugador2, prediccion, estado, hora_inicio, is_live, resultado, fecha_partido } = match;
+    const { jugador1, jugador2, prediccion, estado, hora_inicio, is_live, resultado, fecha_partido, event_status } = match;
+    const { favorited, loading: favLoading, toggle } = useIsFavorite(match.id);
 
-    // Get match status
+    // Solo considerar "en vivo" si el partido ha empezado (fecha+hora en el pasado)
+    const backendSaysLive = estado === 'en_juego' || Boolean(is_live);
+    const hasStarted = isMatchStarted(fecha_partido, hora_inicio);
+    const actuallyLive = backendSaysLive && hasStarted;
+
+    // Get match status (para no-live: mostrar estado; para live real: LiveBadge)
     const matchStatus = formatMatchStatus(estado);
 
-    // Determine if we should show prediction
-    const shouldShowPrediction = estado === 'pendiente' && !is_live && prediccion !== null;
+    // Determine if we should show prediction (robusto: null, undefined o objeto vacío)
+    const hasPrediction = prediccion != null && typeof prediccion === 'object' && prediccion.jugador1_probabilidad != null;
+    const shouldShowPrediction = estado === 'pendiente' && !actuallyLive && hasPrediction;
     const isCompleted = estado === 'completado';
+
+    // Para en vivo: si hay resultado pero sin scores (API antigua o error), usar fallback para mostrar 0-0 en vez de @2.00
+    const scoresForDisplay = resultado?.scores ?? (actuallyLive ? { sets_result: '0-0', sets: [] } : null);
+    const hasScoreToShow = Boolean(
+        resultado && (resultado.marcador || (scoresForDisplay && (scoresForDisplay.sets?.length || scoresForDisplay.sets_result)))
+    );
+
+    const isRetirementOrWalkover = Boolean(
+        event_status && /retired|ret|walk|w\.o|w\/o|default/i.test(event_status)
+    );
+    const getFinishReasonLabel = (s?: string | null): string => {
+        if (!s) return 'Retirada';
+        const lower = s.toLowerCase();
+        if (/retired|ret|retirement/.test(lower)) return 'Retirada';
+        if (/walk|w\.o|w\/o/.test(lower)) return 'Walkover';
+        if (/default/.test(lower)) return 'Default';
+        return s;
+    };
 
     // Determine best option and EV (only for pending matches)
     const bestEV = prediccion ? Math.max(prediccion.jugador1_ev, prediccion.jugador2_ev) : 0;
@@ -68,7 +98,17 @@ export default function MatchCard({ match, onPress }: MatchCardProps) {
     const recommendationText = getRecommendationText();
 
     const handleCardPress = () => {
-        onPress(); // Always navigate to detail page
+        onPress();
+    };
+
+    const handleFavoritePress = async () => {
+        const newStatus = await toggle({
+            player1Name: jugador1.nombre,
+            player2Name: jugador2.nombre,
+            tournament: match.torneo ?? '',
+            eventKey: match.event_key,
+        });
+        if (!newStatus) onFavoriteRemoved?.();
     };
 
     const handlePlayerPress = (playerKey: string, event: any) => {
@@ -90,15 +130,33 @@ export default function MatchCard({ match, onPress }: MatchCardProps) {
                     {/* Status Bar */}
                     <View style={styles.statusBar}>
                         <View style={styles.statusLeft}>
-                            {is_live ? (
+                            {actuallyLive ? (
                                 <LiveBadge />
                             ) : (
-                                <Text style={[styles.statusText, { color: matchStatus.color }]}>
-                                    {matchStatus.emoji} {matchStatus.text}
-                                </Text>
+                                <>
+                                    <Text style={[styles.statusText, { color: matchStatus.color }]}>
+                                        {matchStatus.emoji} {matchStatus.text}
+                                    </Text>
+                                    {isCompleted && isRetirementOrWalkover && (
+                                        <View style={styles.reasonBadge}>
+                                            <Text style={styles.reasonBadgeText}>{getFinishReasonLabel(event_status)}</Text>
+                                        </View>
+                                    )}
+                                </>
                             )}
                         </View>
-                        <Text style={styles.time}>{formatMatchTime(fecha_partido, hora_inicio)}</Text>
+                        <View style={styles.statusRight}>
+                            <Text style={styles.time}>{formatMatchTime(fecha_partido, hora_inicio)}</Text>
+                            {!favLoading && (
+                                <View style={styles.favButton} pointerEvents="box-none">
+                                    <FavoriteButton
+                                        isFavorite={favorited}
+                                        onPress={handleFavoritePress}
+                                        size={20}
+                                    />
+                                </View>
+                            )}
+                        </View>
                     </View>
 
                     {/* Players Section - Unified Layout for All States */}
@@ -130,13 +188,15 @@ export default function MatchCard({ match, onPress }: MatchCardProps) {
                                 )}
                             </View>
                             <View style={styles.rightInfo}>
-                                {isCompleted && resultado ? (
+                                {(isCompleted || actuallyLive) && hasScoreToShow ? (
                                     <CompletedMatchScore
-                                        marcador={resultado.marcador}
+                                        marcador={resultado!.marcador ?? ''}
+                                        scores={scoresForDisplay ?? undefined}
                                         player1Name={jugador1.nombre}
                                         player2Name={jugador2.nombre}
-                                        isWinner1={resultado.ganador === jugador1.nombre}
+                                        isWinner1={resultado!.ganador === jugador1.nombre}
                                         playerIndex={1}
+                                        isLive={actuallyLive}
                                     />
                                 ) : shouldShowPrediction && prediccion ? (
                                     <Text style={styles.probability}>{formatProbability(prediccion.jugador1_probabilidad)}</Text>
@@ -176,13 +236,15 @@ export default function MatchCard({ match, onPress }: MatchCardProps) {
                                 )}
                             </View>
                             <View style={styles.rightInfo}>
-                                {isCompleted && resultado ? (
+                                {(isCompleted || actuallyLive) && hasScoreToShow ? (
                                     <CompletedMatchScore
-                                        marcador={resultado.marcador}
+                                        marcador={resultado!.marcador ?? ''}
+                                        scores={scoresForDisplay ?? undefined}
                                         player1Name={jugador1.nombre}
                                         player2Name={jugador2.nombre}
-                                        isWinner1={resultado.ganador === jugador1.nombre}
+                                        isWinner1={resultado!.ganador === jugador2.nombre}
                                         playerIndex={2}
+                                        isLive={actuallyLive}
                                     />
                                 ) : shouldShowPrediction && prediccion ? (
                                     <Text style={styles.probability}>{formatProbability(prediccion.jugador2_probabilidad)}</Text>
@@ -283,16 +345,39 @@ const styles = StyleSheet.create({
     },
     statusLeft: {
         flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
     },
     statusText: {
         fontSize: 11,
         fontWeight: '700',
         textTransform: 'uppercase',
     },
+    reasonBadge: {
+        backgroundColor: COLORS.warning + '25',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+    },
+    reasonBadgeText: {
+        fontSize: 10,
+        fontWeight: '600',
+        color: COLORS.warning,
+        textTransform: 'uppercase',
+    },
+    statusRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
     time: {
         fontSize: 11,
         color: COLORS.textSecondary,
         fontWeight: '600',
+    },
+    favButton: {
+        padding: 4,
     },
     playerRow: {
         flexDirection: 'row',

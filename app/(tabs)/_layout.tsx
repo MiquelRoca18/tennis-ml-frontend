@@ -1,58 +1,55 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { Platform } from 'react-native';
-
-import { HapticTab } from '@/components/haptic-tab';
-import { Colors } from '@/constants/Colors';
+import { FavoritesRefreshProvider } from '../../src/contexts/FavoritesRefreshContext';
+import { COLORS } from '../../src/utils/constants';
 
 export default function TabLayout() {
   return (
+    <FavoritesRefreshProvider>
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors.brand.neonGreen,
-        tabBarInactiveTintColor: Colors.text.tertiary,
         headerShown: false,
-        tabBarButton: HapticTab,
+        tabBarActiveTintColor: COLORS.primary,
+        tabBarInactiveTintColor: COLORS.textMuted,
         tabBarStyle: {
-          backgroundColor: Colors.background.secondary,
-          borderTopColor: Colors.ui.border,
-          height: Platform.select({ ios: 88, default: 60 }),
-          paddingBottom: Platform.select({ ios: 28, default: 8 }),
-          paddingTop: 8,
+          backgroundColor: COLORS.surface,
+          borderTopColor: COLORS.border,
         },
         tabBarLabelStyle: {
+          fontSize: 12,
           fontWeight: '600',
-          fontSize: 10,
         },
-      }}>
+      }}
+    >
       <Tabs.Screen
         name="index"
         options={{
           title: 'Partidos',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons size={24} name={focused ? 'tennisball' : 'tennisball-outline'} color={color} />
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="tennisball" size={size} color={color} />
           ),
         }}
       />
       <Tabs.Screen
-        name="explore"
+        name="favorites"
         options={{
-          title: 'Stats',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons size={24} name={focused ? 'stats-chart' : 'stats-chart-outline'} color={color} />
+          title: 'Favoritos',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="star" size={size} color={color} />
           ),
         }}
       />
       <Tabs.Screen
-        name="rankings"
+        name="account"
         options={{
-          title: 'Rankings',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons size={24} name={focused ? 'trophy' : 'trophy-outline'} color={color} />
+          title: 'Cuenta',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="person" size={size} color={color} />
           ),
         }}
       />
     </Tabs>
+    </FavoritesRefreshProvider>
   );
 }

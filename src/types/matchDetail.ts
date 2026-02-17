@@ -219,6 +219,12 @@ export interface MatchPrediction {
     probability_player2: number;
     value_bet?: 1 | 2 | null;
     recommendation?: string | null;
+    /** Stake sugerido en € (Kelly) para jugador 1 */
+    kelly_stake_jugador1?: number | null;
+    /** Stake sugerido en € (Kelly) para jugador 2 */
+    kelly_stake_jugador2?: number | null;
+    /** Bankroll con el que se calculó el stake */
+    bankroll_used?: number | null;
 }
 
 // ============================================================

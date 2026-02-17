@@ -53,14 +53,23 @@ export default function AccountScreen() {
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Cuenta</Text>
         </View>
-        <View style={styles.content}>
-          <Text style={styles.placeholderText}>
-            Configura Supabase para acceder a tu cuenta
-          </Text>
-          <Text style={styles.hintText}>
-            Añade EXPO_PUBLIC_SUPABASE_URL y EXPO_PUBLIC_SUPABASE_ANON_KEY en .env
-          </Text>
-        </View>
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+          <TouchableOpacity
+            style={styles.settingsRow}
+            onPress={() => router.push('/settings')}
+          >
+            <Text style={styles.settingsRowLabel}>Configuración (bankroll y apuestas)</Text>
+            <Text style={styles.chevron}>›</Text>
+          </TouchableOpacity>
+          <View style={styles.content}>
+            <Text style={styles.placeholderText}>
+              Configura Supabase para acceder a tu cuenta
+            </Text>
+            <Text style={styles.hintText}>
+              Añade EXPO_PUBLIC_SUPABASE_URL y EXPO_PUBLIC_SUPABASE_ANON_KEY en .env
+            </Text>
+          </View>
+        </ScrollView>
       </View>
     );
   }
@@ -81,7 +90,7 @@ export default function AccountScreen() {
             style={styles.settingsRow}
             onPress={() => router.push('/settings')}
           >
-            <Text style={styles.settingsRowLabel}>Configuración</Text>
+            <Text style={styles.settingsRowLabel}>Configuración (bankroll, apuestas)</Text>
             <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
           <AuthButton
@@ -110,6 +119,13 @@ export default function AccountScreen() {
         <Text style={styles.headerSubtitle}>Inicia sesión para sincronizar tus favoritos</Text>
       </View>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        <TouchableOpacity
+          style={styles.settingsRow}
+          onPress={() => router.push('/settings')}
+        >
+          <Text style={styles.settingsRowLabel}>Configuración (bankroll, apuestas)</Text>
+          <Text style={styles.chevron}>›</Text>
+        </TouchableOpacity>
         <AuthButton
           title="Iniciar sesión"
           onPress={() => router.push('/(auth)/login')}

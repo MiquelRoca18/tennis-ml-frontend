@@ -24,6 +24,7 @@ export default function ValueAnalysis({ prediction, player1Name, player2Name }: 
         const sign = value >= 0 ? '+' : '';
         return `${sign}${(value * 100).toFixed(1)}%`;
     };
+    const formatEuro = (value: number) => `${value.toFixed(2)}€`;
 
     const getEVColor = (ev: number) => {
         if (ev > 0) return COLORS.success;
@@ -90,16 +91,16 @@ export default function ValueAnalysis({ prediction, player1Name, player2Name }: 
 
                     <View style={styles.divider} />
 
-                    {/* Kelly Criterion */}
+                    {/* Kelly Criterion - Stake sugerido en € */}
                     <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Kelly Criterion Stake</Text>
+                        <Text style={styles.sectionTitle}>Stake sugerido (Kelly)</Text>
                         <View style={styles.row}>
                             <Text style={styles.playerLabel}>{player1Name}:</Text>
-                            <Text style={styles.value}>{formatPercentage(kelly1)}</Text>
+                            <Text style={styles.value}>{kelly1 > 0 ? formatEuro(kelly1) : '—'}</Text>
                         </View>
                         <View style={styles.row}>
                             <Text style={styles.playerLabel}>{player2Name}:</Text>
-                            <Text style={styles.value}>{formatPercentage(kelly2)}</Text>
+                            <Text style={styles.value}>{kelly2 > 0 ? formatEuro(kelly2) : '—'}</Text>
                         </View>
                     </View>
                 </View>

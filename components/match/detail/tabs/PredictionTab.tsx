@@ -10,9 +10,11 @@ import WinProbability from '../prediction/WinProbability';
 
 interface PredictionTabProps {
     match: any;
+    /** Bankroll usado para los stakes (opcional; si viene del listado con betting_config) */
+    bankrollUsed?: number | null;
 }
 
-export default function PredictionTab({ match }: PredictionTabProps) {
+export default function PredictionTab({ match, bankrollUsed }: PredictionTabProps) {
     const { jugador1, jugador2, prediccion } = match;
 
     // Check if prediction data exists
@@ -50,7 +52,7 @@ export default function PredictionTab({ match }: PredictionTabProps) {
             <ConfidenceIndicator prediction={prediccion} />
 
             {/* Betting Recommendation - Highlighted */}
-            <BettingRecommendation prediction={prediccion} />
+            <BettingRecommendation prediction={prediccion} bankrollUsed={bankrollUsed} />
 
             {/* Value Analysis - Expandable */}
             <ValueAnalysis

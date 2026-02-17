@@ -9,7 +9,6 @@ import { formatSeed, getCountryFlag } from '../../src/utils/countryUtils';
 import { isMatchStarted } from '../../src/utils/dateUtils';
 import { formatMatchStatus, formatMatchTime, formatOdds, formatPercentage, formatProbability } from '../../src/utils/formatters';
 import CompletedMatchScore from './CompletedMatchScore';
-import ConfidenceBadge from './ConfidenceBadge';
 import LiveBadge from './LiveBadge';
 import PlayerLogo from './PlayerLogo';
 
@@ -38,7 +37,7 @@ export default function MatchCard({ match, onPress, onFavoriteRemoved }: MatchCa
     const shouldShowPrediction = estado === 'pendiente' && !actuallyLive && hasPrediction;
     const isCompleted = estado === 'completado';
 
-    // Para en vivo: si hay resultado pero sin scores (API antigua o error), usar fallback para mostrar 0-0 en vez de @2.00
+    // Para en vivo: si hay resultado pero sin scores (API antigua o error), usar fallback para mostrar 0-0
     const scoresForDisplay = resultado?.scores ?? (actuallyLive ? { sets_result: '0-0', sets: [] } : null);
     const hasScoreToShow = Boolean(
         resultado && (resultado.marcador || (scoresForDisplay && (scoresForDisplay.sets?.length || scoresForDisplay.sets_result)))
@@ -79,24 +78,6 @@ export default function MatchCard({ match, onPress, onFavoriteRemoved }: MatchCa
             : shouldShowAsMarginal ? COLORS.warning
                 : COLORS.danger;
 
-    // Determine recommendation text
-    const getRecommendationText = () => {
-        if (!prediccion) return null;
-        if (!prediccion.mejor_opcion) return null;
-
-        if (isLowConfidence) {
-            return '❌ NO APOSTAR - Baja confianza';
-        }
-
-        if (isMediumConfidence && isBet) {
-            return `⚠️ ${prediccion.mejor_opcion} `;
-        }
-
-        return prediccion.mejor_opcion;
-    };
-
-    const recommendationText = getRecommendationText();
-
     const handleCardPress = () => {
         onPress();
     };
@@ -112,10 +93,10 @@ export default function MatchCard({ match, onPress, onFavoriteRemoved }: MatchCa
     };
 
     const handlePlayerPress = (playerKey: string, event: any) => {
-        event.stopPropagation();
-        const keyNum = parseInt(playerKey);
-        if (!isNaN(keyNum)) {
-            router.push(`/ player / ${keyNum} ` as any);
+        event?.stopPropagation?.();
+        const key = String(playerKey);
+        if (key) {
+            router.push({ pathname: '/player/[key]', params: { key } } as any);
         }
     };
 
@@ -200,9 +181,9 @@ export default function MatchCard({ match, onPress, onFavoriteRemoved }: MatchCa
                                     />
                                 ) : shouldShowPrediction && prediccion ? (
                                     <Text style={styles.probability}>{formatProbability(prediccion.jugador1_probabilidad)}</Text>
-                                ) : (
+                                ) : jugador1.cuota > 0 ? (
                                     <Text style={styles.odds}>@{formatOdds(jugador1.cuota)}</Text>
-                                )}
+                                ) : null}
                             </View>
                         </View>
 
@@ -248,52 +229,28 @@ export default function MatchCard({ match, onPress, onFavoriteRemoved }: MatchCa
                                     />
                                 ) : shouldShowPrediction && prediccion ? (
                                     <Text style={styles.probability}>{formatProbability(prediccion.jugador2_probabilidad)}</Text>
-                                ) : (
+                                ) : jugador2.cuota > 0 ? (
                                     <Text style={styles.odds}>@{formatOdds(jugador2.cuota)}</Text>
-                                )}
+                                ) : null}
                             </View>
                         </View>
                     </>
 
-                    {/* Confidence Warning - Only for pending matches with low/medium confidence */}
-                    {shouldShowPrediction && prediccion && showConfidenceWarning && (
-                        <View style={[
-                            styles.warningBanner,
-                            { backgroundColor: isLowConfidence ? COLORS.danger + '15' : COLORS.warning + '15' }
-                        ]}>
-                            <Text style={styles.warningIcon}>{isLowConfidence ? '❌' : '⚠️'}</Text>
-                            <View style={styles.warningContent}>
-                                <Text style={[
-                                    styles.warningTitle,
-                                    { color: isLowConfidence ? COLORS.danger : COLORS.warning }
-                                ]}>
-                                    {isLowConfidence ? 'BAJA CONFIANZA' : 'Confianza Media'}
-                                </Text>
-                                <Text style={styles.warningSubtitle}>
-                                    {isLowConfidence
-                                        ? 'Jugadores sin historial - No recomendado'
-                                        : 'Datos limitados disponibles'}
-                                </Text>
-                            </View>
-                        </View>
-                    )}
-
-                    {/* Footer - Only for pending matches */}
+                    {/* Footer - Solo EV y cantidad sugerida (sin texto de recomendación ni confianza) */}
                     {shouldShowPrediction && prediccion && (
                         <View style={styles.footer}>
-                            <View style={styles.evContainer}>
+                            <View style={styles.footerTop}>
                                 <Text style={styles.evLabel}>EV:</Text>
                                 <Text style={[styles.evValue, { color: evColor }]}>
                                     {formatPercentage(bestEV)}
                                 </Text>
-                                {recommendationText && (
-                                    <Text style={[styles.recommendation, { color: evColor }]} numberOfLines={1}>
-                                        {recommendationText}
-                                    </Text>
-                                )}
                             </View>
-                            {confidenceLevel && (
-                                <ConfidenceBadge confidenceLevel={confidenceLevel} />
+                            {((prediccion.kelly_stake_jugador1 ?? 0) || (prediccion.kelly_stake_jugador2 ?? 0)) > 0 && (
+                                <View style={styles.footerStakeRow}>
+                                    <Text style={styles.stakeSuggested}>
+                                        Cantidad sugerida: {((prediccion.kelly_stake_jugador1 ?? 0) || (prediccion.kelly_stake_jugador2 ?? 0)).toFixed(2)}€
+                                    </Text>
+                                </View>
                             )}
                         </View>
                     )}
@@ -431,8 +388,14 @@ const styles = StyleSheet.create({
         paddingTop: 12,
         borderTopWidth: 1,
         borderTopColor: COLORS.border,
+        gap: 6,
+    },
+    footerTop: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    footerStakeRow: {
+        flexDirection: 'row',
         alignItems: 'center',
     },
     evContainer: {
@@ -455,6 +418,11 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: '600',
         flex: 1,
+    },
+    stakeSuggested: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: COLORS.primary,
     },
     warningBanner: {
         flexDirection: 'row',

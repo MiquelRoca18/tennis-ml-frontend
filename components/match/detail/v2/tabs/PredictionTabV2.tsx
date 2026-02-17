@@ -8,18 +8,23 @@
  * - Value bet indicator
  */
 
-import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useAuth } from '../../../../../src/contexts/AuthContext';
+import { addBet } from '../../../../../src/services/betsService';
 import { MatchFullResponse, getShortName } from '../../../../../src/types/matchDetail';
 import { COLORS } from '../../../../../src/utils/constants';
 
 interface PredictionTabV2Props {
     data: MatchFullResponse;
     scrollable?: boolean;
+    /** Tras registrar una apuesta se llama para refrescar datos (nuevo bankroll) */
+    onBetPlaced?: () => void;
 }
 
-export default function PredictionTabV2({ data, scrollable = true }: PredictionTabV2Props) {
-    const { prediction, player1, player2, odds } = data;
+export default function PredictionTabV2({ data, scrollable = true, onBetPlaced }: PredictionTabV2Props) {
+    const { user } = useAuth();
+    const { prediction, player1, player2, odds, match: matchInfo } = data;
 
     const p1Short = getShortName(player1.name);
     const p2Short = getShortName(player2.name);
@@ -43,19 +48,55 @@ export default function PredictionTabV2({ data, scrollable = true }: PredictionT
     const winnerProb = isP1Winner ? prediction.probability_player1 : prediction.probability_player2;
     const loserProb = isP1Winner ? prediction.probability_player2 : prediction.probability_player1;
 
-    // Determinar nivel de confianza
-    const getConfidenceLevel = (conf: number) => {
-        if (conf >= 75) return { label: 'MUY ALTA', color: COLORS.success, emoji: '🔥' };
-        if (conf >= 60) return { label: 'ALTA', color: COLORS.primary, emoji: '💪' };
-        if (conf >= 50) return { label: 'MODERADA', color: COLORS.warning, emoji: '🤔' };
-        return { label: 'BAJA', color: COLORS.danger, emoji: '⚠️' };
+    const stakeEur = (prediction.kelly_stake_jugador1 ?? 0) || (prediction.kelly_stake_jugador2 ?? 0);
+    const bankrollUsed = prediction.bankroll_used ?? 0;
+    const hasStake = stakeEur > 0;
+    const recommendationText = prediction.recommendation ?? (prediction as { recomendacion?: string }).recomendacion ?? '';
+    const [betLoading, setBetLoading] = useState(false);
+
+    const handleRegisterBet = async () => {
+        if (!hasStake || stakeEur <= 0 || !matchInfo?.id) return;
+        Alert.alert(
+            'Registrar apuesta',
+            `¿Registrar apuesta de ${stakeEur.toFixed(2)}€?\nSe restará del bankroll (${bankrollUsed.toFixed(0)}€ → ${(bankrollUsed - stakeEur).toFixed(0)}€). Las siguientes cantidades sugeridas usarán el nuevo bankroll.`,
+            [
+                { text: 'Cancelar', style: 'cancel' },
+                {
+                    text: 'Apostar',
+                    onPress: async () => {
+                        setBetLoading(true);
+                        try {
+                            const result = await addBet(
+                                {
+                                    matchId: matchInfo.id,
+                                    stakeEur,
+                                    player1Name: player1.name,
+                                    player2Name: player2.name,
+                                    tournament: matchInfo.tournament ?? '',
+                                },
+                                user?.id
+                            );
+                            if (!result.success) {
+                                Alert.alert('Error', result.error ?? 'No se pudo registrar la apuesta');
+                                return;
+                            }
+                            onBetPlaced?.();
+                            Alert.alert(
+                                'Apuesta registrada',
+                                result.bankrollAfter != null
+                                    ? `Bankroll actualizado: ${result.bankrollAfter.toFixed(0)}€`
+                                    : 'Apuesta guardada. Verás el nuevo bankroll al refrescar.'
+                            );
+                        } catch (e: any) {
+                            Alert.alert('Error', e.message || 'No se pudo registrar la apuesta');
+                        } finally {
+                            setBetLoading(false);
+                        }
+                    },
+                },
+            ]
+        );
     };
-
-    const confidence = getConfidenceLevel(prediction.confidence);
-
-    // Value bet
-    const hasValueBet = prediction.value_bet !== null && prediction.value_bet !== undefined;
-    const valueBetPlayer = prediction.value_bet === 1 ? p1Short : p2Short;
 
     const content = (
         <>
@@ -110,39 +151,38 @@ export default function PredictionTabV2({ data, scrollable = true }: PredictionT
                 </View>
             </View>
 
-            {/* Confidence Card */}
-            <View style={styles.confidenceCard}>
-                <View style={styles.confidenceHeader}>
-                    <Text style={styles.confidenceEmoji}>{confidence.emoji}</Text>
-                    <View>
-                        <Text style={styles.confidenceLabel}>Nivel de Confianza</Text>
-                        <Text style={[styles.confidenceLevel, { color: confidence.color }]}>
-                            {confidence.label}
-                        </Text>
-                    </View>
-                </View>
-                <View style={[styles.confidenceValueContainer, { backgroundColor: confidence.color + '20' }]}>
-                    <Text style={[styles.confidenceValue, { color: confidence.color }]}>
-                        {prediction.confidence.toFixed(0)}%
-                    </Text>
-                </View>
+            {/* Recomendación y cantidad sugerida (sin card de confianza ni value bet duplicado) */}
+            <View style={styles.recommendationCard}>
+                <Text style={styles.recommendationCardTitle}>Recomendación de apuesta</Text>
+                <Text style={styles.recommendationText}>
+                    {recommendationText || '—'}
+                </Text>
+                <Text style={styles.stakeSuggestedBlock}>
+                    Cantidad sugerida:{' '}
+                    {hasStake ? (
+                        <>
+                            <Text style={styles.stakeValue}>{stakeEur.toFixed(2)}€</Text>
+                            {bankrollUsed > 0 && (
+                                <Text style={styles.bankrollNote}> (bankroll {bankrollUsed.toFixed(0)}€)</Text>
+                            )}
+                        </>
+                    ) : (
+                        <Text style={styles.stakeValue}>—</Text>
+                    )}
+                </Text>
             </View>
 
-            {/* Value Bet Card */}
-            {hasValueBet && (
-                <View style={styles.valueBetCard}>
-                    <View style={styles.valueBetHeader}>
-                        <Text style={styles.valueBetIcon}>💎</Text>
-                        <Text style={styles.valueBetTitle}>Value Bet Detectado</Text>
-                    </View>
-                    <Text style={styles.valueBetText}>
-                        Nuestro modelo sugiere que hay valor apostando a{' '}
-                        <Text style={styles.valueBetPlayer}>{valueBetPlayer}</Text>
+            {/* Botón Registrar apuesta */}
+            {hasStake && matchInfo?.id && (
+                <TouchableOpacity
+                    style={[styles.betButton, betLoading && styles.betButtonDisabled]}
+                    onPress={handleRegisterBet}
+                    disabled={betLoading}
+                >
+                    <Text style={styles.betButtonText}>
+                        {betLoading ? 'Registrando...' : `Registrar apuesta (${stakeEur.toFixed(2)}€)`}
                     </Text>
-                    <Text style={styles.valueBetDisclaimer}>
-                        * La probabilidad estimada es mayor que la implícita en las cuotas
-                    </Text>
-                </View>
+                </TouchableOpacity>
             )}
 
             {/* Model Info */}
@@ -340,6 +380,38 @@ const styles = StyleSheet.create({
         fontWeight: '800',
     },
 
+    // Recomendación y cantidad sugerida
+    recommendationCard: {
+        backgroundColor: COLORS.surface,
+        borderRadius: 16,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+    },
+    recommendationCardTitle: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: COLORS.textSecondary,
+        marginBottom: 8,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    recommendationText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: COLORS.textPrimary,
+        marginBottom: 8,
+    },
+    stakeSuggestedBlock: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: COLORS.textSecondary,
+    },
+    stakeValue: {
+        fontWeight: '800',
+        color: COLORS.primary,
+    },
+
     // Value Bet Card
     valueBetCard: {
         backgroundColor: COLORS.warning + '15',
@@ -377,8 +449,54 @@ const styles = StyleSheet.create({
         marginTop: 8,
         fontStyle: 'italic',
     },
+    stakeSuggested: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: COLORS.primary,
+        marginTop: 8,
+    },
+    bankrollNote: {
+        fontSize: 13,
+        fontWeight: '500',
+        color: COLORS.textSecondary,
+    },
+    stakeCard: {
+        backgroundColor: COLORS.primary + '18',
+        borderRadius: 16,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: COLORS.primary + '40',
+    },
+    stakeCardTitle: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: COLORS.textSecondary,
+        marginBottom: 4,
+        textTransform: 'uppercase',
+    },
+    stakeCardValue: {
+        fontSize: 20,
+        fontWeight: '800',
+        color: COLORS.primary,
+    },
 
     // Model Info
+    betButton: {
+        backgroundColor: COLORS.primary,
+        borderRadius: 12,
+        paddingVertical: 14,
+        paddingHorizontal: 20,
+        alignItems: 'center',
+        marginTop: 16,
+    },
+    betButtonDisabled: {
+        opacity: 0.6,
+    },
+    betButtonText: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#fff',
+    },
     modelInfo: {
         backgroundColor: COLORS.surface,
         borderRadius: 12,

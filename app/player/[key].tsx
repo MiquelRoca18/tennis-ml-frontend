@@ -20,24 +20,26 @@ import { COLORS } from '../../src/utils/constants';
 export default function PlayerProfilePage() {
     const router = useRouter();
     const params = useLocalSearchParams();
-    const playerKey = parseInt(params.key as string);
+    const rawKey = params.key as string | undefined;
+    const playerKey = rawKey ? parseInt(rawKey, 10) : NaN;
+    const validKey = Number.isFinite(playerKey) ? playerKey : null;
 
-    const { player, loading: playerLoading, error: playerError } = usePlayer(playerKey);
-    const { data: matchesData, loading: matchesLoading } = usePlayerMatches(playerKey, 15);
+    const { player, loading: playerLoading, error: playerError } = usePlayer(validKey);
+    const { data: matchesData, loading: matchesLoading } = usePlayerMatches(validKey, 15);
 
     const [stats, setStats] = useState<PlayerStatsResponse[]>([]);
     const [statsLoading, setStatsLoading] = useState(true);
 
     useEffect(() => {
         async function loadStats() {
-            if (!playerKey) return;
+            if (validKey == null) return;
 
             setStatsLoading(true);
             try {
                 // Fetch stats for each surface
                 const surfaces = ['Hard', 'Clay', 'Grass'];
                 const statsPromises = surfaces.map(surface =>
-                    fetchPlayerStats(playerKey, surface).catch(() => null)
+                    fetchPlayerStats(validKey, surface).catch(() => null)
                 );
 
                 const results = await Promise.all(statsPromises);
@@ -51,7 +53,18 @@ export default function PlayerProfilePage() {
         }
 
         loadStats();
-    }, [playerKey]);
+    }, [validKey]);
+
+    if (validKey == null) {
+        return (
+            <View style={styles.loadingContainer}>
+                <Text style={styles.errorText}>Jugador no válido</Text>
+                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+                    <Text style={styles.backButtonText}>Volver</Text>
+                </TouchableOpacity>
+            </View>
+        );
+    }
 
     if (playerLoading) {
         return (

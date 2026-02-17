@@ -85,7 +85,7 @@ export default function MatchDetailV2({ matchId }: MatchDetailV2Props) {
     const renderTabContent = () => {
         switch (activeTab) {
             case 'Overview': return <OverviewTabV2 data={data} scrollable={false} />;
-            case 'Prediction': return <PredictionTabV2 data={data} scrollable={false} />;
+            case 'Prediction': return <PredictionTabV2 data={data} scrollable={false} onBetPlaced={refresh} />;
             case 'Odds': return <OddsTabV2 data={data} scrollable={false} />;
             case 'Stats': return <StatsTabV2 data={data} scrollable={false} />;
             case 'H2H': return <H2HTabV2 data={data} scrollable={false} />;

@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
     LayoutAnimation,
@@ -22,6 +23,8 @@ interface TournamentSectionProps {
     matches: Match[];
     renderMatch: (match: Match) => React.ReactNode;
     initiallyExpanded?: boolean;
+    /** Si se pasa, el encabezado del torneo es clicable y navega al detalle */
+    tournamentKey?: string | null;
 }
 
 export default function TournamentSection({
@@ -30,12 +33,20 @@ export default function TournamentSection({
     matches,
     renderMatch,
     initiallyExpanded = false,
+    tournamentKey = null,
 }: TournamentSectionProps) {
+    const router = useRouter();
     const [isExpanded, setIsExpanded] = useState(initiallyExpanded);
 
     const toggleExpand = () => {
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         setIsExpanded(!isExpanded);
+    };
+
+    const goToTournament = () => {
+        if (tournamentKey) {
+            router.push({ pathname: '/tournament/[key]', params: { key: tournamentKey, name: tournamentName } } as any);
+        }
     };
 
     // Count live matches
@@ -52,9 +63,20 @@ export default function TournamentSection({
                 <View style={styles.headerLeft}>
                     <Text style={styles.chevron}>{isExpanded ? '▼' : '▶'}</Text>
                     <View style={styles.tournamentInfo}>
-                        <Text style={styles.tournamentName} numberOfLines={1}>
-                            {tournamentName}
-                        </Text>
+                        <View style={styles.tournamentNameRow}>
+                            <Text style={styles.tournamentName} numberOfLines={1}>
+                                {tournamentName}
+                            </Text>
+                            {tournamentKey ? (
+                                <TouchableOpacity
+                                    onPress={(e) => { e?.stopPropagation?.(); goToTournament(); }}
+                                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                    style={styles.tournamentLink}
+                                >
+                                    <Text style={styles.tournamentLinkText}>Ver torneo</Text>
+                                </TouchableOpacity>
+                            ) : null}
+                        </View>
                         <Text style={styles.surface}>{surface}</Text>
                     </View>
                 </View>
@@ -120,11 +142,26 @@ const styles = StyleSheet.create({
     tournamentInfo: {
         flex: 1,
     },
+    tournamentNameRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 2,
+    },
     tournamentName: {
         fontSize: 16,
         fontWeight: '700',
         color: COLORS.textPrimary,
-        marginBottom: 2,
+        flex: 1,
+    },
+    tournamentLink: {
+        paddingVertical: 2,
+        paddingHorizontal: 6,
+    },
+    tournamentLinkText: {
+        fontSize: 12,
+        color: COLORS.primary,
+        fontWeight: '600',
     },
     surface: {
         fontSize: 12,

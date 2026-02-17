@@ -35,15 +35,17 @@ function getRankingMovementColor(movement: 'up' | 'down' | 'same' | null) {
 }
 
 export default function PlayerHeader({ player }: PlayerHeaderProps) {
-    const ranking = player.atp_ranking || player.wta_ranking;
-    const league = player.atp_ranking ? 'ATP' : 'WTA';
+    const ranking = player.atp_ranking ?? player.wta_ranking;
+    const league = player.atp_ranking != null ? 'ATP' : 'WTA';
+    const country = player.player_country ?? player.country;
+    const points = player.ranking_points ?? player.atp_points ?? player.wta_points;
 
     return (
         <View style={styles.container}>
             {/* Player Logo */}
             <View style={styles.logoContainer}>
                 <PlayerLogo
-                    logo={player.player_logo}
+                    logo={player.player_logo ?? undefined}
                     name={player.player_name}
                     size={100}
                 />
@@ -53,37 +55,39 @@ export default function PlayerHeader({ player }: PlayerHeaderProps) {
             <Text style={styles.name}>{player.player_name}</Text>
 
             {/* Country */}
-            {player.player_country && (
-                <Text style={styles.country}>{player.player_country}</Text>
-            )}
+            {country ? (
+                <Text style={styles.country}>{country}</Text>
+            ) : null}
 
             {/* Ranking Info */}
-            {ranking && (
+            {(ranking != null || points != null) && (
                 <View style={styles.rankingContainer}>
-                    <View style={styles.rankingBadge}>
-                        <Text style={styles.rankingLabel}>{league} Ranking</Text>
-                        <View style={styles.rankingRow}>
-                            <Text style={styles.rankingNumber}>#{ranking}</Text>
-                            {player.ranking_movement && (
-                                <View style={[
-                                    styles.movementBadge,
-                                    { backgroundColor: getRankingMovementColor(player.ranking_movement) + '20' }
-                                ]}>
-                                    <Text style={[
-                                        styles.movementIcon,
-                                        { color: getRankingMovementColor(player.ranking_movement) }
+                    {ranking != null && (
+                        <View style={styles.rankingBadge}>
+                            <Text style={styles.rankingLabel}>{league} Ranking</Text>
+                            <View style={styles.rankingRow}>
+                                <Text style={styles.rankingNumber}>#{ranking}</Text>
+                                {player.ranking_movement && (
+                                    <View style={[
+                                        styles.movementBadge,
+                                        { backgroundColor: getRankingMovementColor(player.ranking_movement) + '20' }
                                     ]}>
-                                        {getRankingMovementIcon(player.ranking_movement)}
-                                    </Text>
-                                </View>
-                            )}
+                                        <Text style={[
+                                            styles.movementIcon,
+                                            { color: getRankingMovementColor(player.ranking_movement) }
+                                        ]}>
+                                            {getRankingMovementIcon(player.ranking_movement)}
+                                        </Text>
+                                    </View>
+                                )}
+                            </View>
                         </View>
-                    </View>
+                    )}
 
-                    {player.ranking_points && (
+                    {points != null && (
                         <View style={styles.pointsBadge}>
                             <Text style={styles.pointsValue}>
-                                {player.ranking_points.toLocaleString()}
+                                {Number(points).toLocaleString()}
                             </Text>
                             <Text style={styles.pointsLabel}>puntos</Text>
                         </View>

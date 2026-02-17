@@ -32,6 +32,24 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="bets"
+        options={{
+          title: 'Mis apuestas',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="wallet" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="explore"
+        options={{
+          title: 'Explorar',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="compass" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="favorites"
         options={{
           title: 'Favoritos',

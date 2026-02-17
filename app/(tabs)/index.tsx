@@ -9,7 +9,6 @@ import {
 } from 'react-native';
 import ErrorMessage from '../../components/common/ErrorMessage';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
-import ConfidenceFilter from '../../components/match/ConfidenceFilter';
 import DateSelector from '../../components/match/DateSelector';
 import MatchCard from '../../components/match/MatchCard';
 import StatusFilterTabs, { StatusFilterValue } from '../../components/match/StatusFilterTabs';
@@ -17,7 +16,7 @@ import TournamentSection from '../../components/match/TournamentSection';
 import { useFavoritesRefresh } from '../../src/contexts/FavoritesRefreshContext';
 import { useSmartAutoRefresh } from '../../src/hooks/useAutoRefresh';
 import { fetchMatches } from '../../src/services/api/matchService';
-import { ConfidenceLevel, Match } from '../../src/types/api';
+import { Match } from '../../src/types/api';
 import { COLORS } from '../../src/utils/constants';
 import { formatDateLong, getDateRange, getTodayDate, isMatchStarted } from '../../src/utils/dateUtils';
 
@@ -30,8 +29,8 @@ export default function MatchFeedScreen() {
   const [error, setError] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>(getTodayDate());
   const [statusFilter, setStatusFilter] = useState<StatusFilterValue>('ALL');
-  const [confidenceFilter, setConfidenceFilter] = useState<'ALL' | ConfidenceLevel>('ALL');
   const [matchesSummary, setMatchesSummary] = useState<any>(null);
+  const [bettingConfig, setBettingConfig] = useState<{ bankroll: number } | null>(null);
 
   // Generate date range for selector (7 days before and after today)
   const dateRange = useMemo(() => getDateRange(7, 7), []);
@@ -43,6 +42,7 @@ export default function MatchFeedScreen() {
       const response = await fetchMatches(date);
       setMatches(response.partidos);
       setMatchesSummary(response.resumen);
+      if (response.betting_config) setBettingConfig(response.betting_config);
     } catch (err: any) {
       setError(err.message || 'Error al cargar los partidos');
     } finally {
@@ -97,13 +97,14 @@ export default function MatchFeedScreen() {
     setLoading(true);
   };
 
-  // Navigate to match detail
+  // Navigate to match detail (pass bankroll so detail can show "según tu bankroll de X€" if needed)
   const handleMatchPress = (match: Match) => {
     router.push({
       pathname: '/match/[id]' as any,
       params: {
         id: match.id.toString(),
         match: JSON.stringify(match),
+        ...(bettingConfig?.bankroll != null && { bankroll: String(bettingConfig.bankroll) }),
       },
     });
   };
@@ -122,20 +123,11 @@ export default function MatchFeedScreen() {
     en_juego: matches.filter(m => m.estado === 'en_juego').length,
   }), [matches]);
 
-  // Filter by confidence (applied after status filter)
-  const filteredMatches = useMemo(() => {
-    if (confidenceFilter === 'ALL') return statusFilteredMatches;
-    return statusFilteredMatches.filter(match => {
-      const level = match.prediccion?.confidence_level;
-      return level === confidenceFilter;
-    });
-  }, [statusFilteredMatches, confidenceFilter]);
-
-  // Group matches by tournament (from filtered list)
+  // Group matches by tournament (from status-filtered list)
   const matchesByTournament = useMemo(() => {
     const grouped = new Map<string, Match[]>();
 
-    filteredMatches.forEach((match) => {
+    statusFilteredMatches.forEach((match) => {
       const tournamentKey = `${match.torneo || 'Sin Torneo'}_${match.superficie}`;
       if (!grouped.has(tournamentKey)) {
         grouped.set(tournamentKey, []);
@@ -158,23 +150,6 @@ export default function MatchFeedScreen() {
     });
 
     return grouped;
-  }, [filteredMatches]);
-
-  // Calculate confidence counts (from status-filtered list)
-  const confidenceCounts = useMemo(() => {
-    const counts = { all: statusFilteredMatches.length, HIGH: 0, MEDIUM: 0, LOW: 0 };
-    statusFilteredMatches.forEach(match => {
-      const level = match.prediccion?.confidence_level;
-      if (level === 'HIGH') counts.HIGH++;
-      else if (level === 'MEDIUM') counts.MEDIUM++;
-      else if (level === 'LOW') counts.LOW++;
-    });
-    return counts;
-  }, [statusFilteredMatches]);
-
-  // Check if any match has confidence data (in status-filtered list)
-  const hasConfidenceData = useMemo(() => {
-    return statusFilteredMatches.some(m => m.prediccion?.confidence_level);
   }, [statusFilteredMatches]);
 
   // Render match card
@@ -256,25 +231,16 @@ export default function MatchFeedScreen() {
         counts={statusCounts}
       />
 
-      {/* Confidence Filter - Only show if we have confidence data */}
-      {hasConfidenceData && (
-        <ConfidenceFilter
-          selectedFilter={confidenceFilter}
-          onFilterChange={setConfidenceFilter}
-          counts={confidenceCounts}
-        />
-      )}
-
       {/* Match Count Summary */}
-      {filteredMatches.length > 0 && (
+      {statusFilteredMatches.length > 0 && (
         <View style={styles.summaryBar}>
           <Text style={styles.summaryText}>
-            {filteredMatches.length} {filteredMatches.length === 1 ? 'partido' : 'partidos'}
-            {(statusFilter !== 'ALL' || confidenceFilter !== 'ALL') && ` (filtrado)`}
+            {statusFilteredMatches.length} {statusFilteredMatches.length === 1 ? 'partido' : 'partidos'}
+            {statusFilter !== 'ALL' && ` (filtrado)`}
           </Text>
-          {filteredMatches.filter(m => m.estado === 'en_juego').length > 0 && (
+          {statusFilteredMatches.filter(m => m.estado === 'en_juego').length > 0 && (
             <Text style={styles.liveIndicator}>
-              🔴 {filteredMatches.filter(m => m.estado === 'en_juego').length} en vivo
+              🔴 {statusFilteredMatches.filter(m => m.estado === 'en_juego').length} en vivo
             </Text>
           )}
         </View>
@@ -296,13 +262,17 @@ export default function MatchFeedScreen() {
           renderEmptyState()
         ) : (
           Array.from(matchesByTournament.entries()).map(([tournamentKey, tournamentMatches]) => {
-            const [tournamentName, surface] = tournamentKey.split('_');
+            const parts = tournamentKey.split('_');
+            const surface = parts.pop() ?? '';
+            const tournamentName = parts.join('_') || 'Sin Torneo';
             const filteredTournamentMatches = tournamentMatches;
 
-            // Skip tournament if no matches (already filtered by status + confidence)
             if (filteredTournamentMatches.length === 0) return null;
 
             const hasLiveMatches = filteredTournamentMatches.some(m => m.estado === 'en_juego');
+
+            const firstMatch = filteredTournamentMatches[0];
+            const tournamentId = firstMatch?.tournament_key != null ? String(firstMatch.tournament_key) : null;
 
             return (
               <TournamentSection
@@ -312,6 +282,7 @@ export default function MatchFeedScreen() {
                 matches={filteredTournamentMatches}
                 renderMatch={renderMatch}
                 initiallyExpanded={hasLiveMatches}
+                tournamentKey={tournamentId}
               />
             );
           })

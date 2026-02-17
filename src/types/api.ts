@@ -105,6 +105,11 @@ export interface Match {
     event_status?: string | null;
 }
 
+/** Configuración de apuestas usada para los stakes mostrados (bankroll actual) */
+export interface BettingConfig {
+    bankroll: number;
+}
+
 export interface MatchesResponse {
     fecha: string;
     es_hoy: boolean;
@@ -115,6 +120,17 @@ export interface MatchesResponse {
         pendientes: number;
     };
     partidos: Match[];
+    /** Bankroll usado para calcular los stakes de cada predicción */
+    betting_config?: BettingConfig | null;
+}
+
+/** Respuesta GET /settings/betting */
+export interface BettingSettingsResponse {
+    bankroll: number;
+    min_stake_eur: number;
+    max_stake_eur: number | null;
+    max_stake_pct: number;
+    kelly_fraction: number;
 }
 
 export interface PredictMatchRequest {
@@ -328,19 +344,22 @@ export interface MatchAnalysisResponse extends MatchDetailsResponse {
 // ELITE API TYPES
 // ============================================
 
-// Player Types
+// Player Types (profile from GET /players/:key - backend returns DB columns: country, atp_points, etc.)
 export interface Player {
-    player_key: number;
+    player_key: number | string;
     player_name: string;
-    player_country: string | null;
-    player_birthday: string | null;
-    player_logo: string | null;
-    atp_ranking: number | null;
-    wta_ranking: number | null;
-    ranking_movement: 'up' | 'down' | 'same' | null;
-    ranking_points: number | null;
-    last_updated: string;
-    created_at: string;
+    player_country?: string | null;
+    country?: string | null;  // backend DB column name
+    player_birthday?: string | null;
+    player_logo?: string | null;
+    atp_ranking?: number | null;
+    wta_ranking?: number | null;
+    atp_points?: number | null;
+    wta_points?: number | null;
+    ranking_movement?: 'up' | 'down' | 'same' | null;
+    ranking_points?: number | null;  // display: atp_points or wta_points
+    last_updated?: string;
+    created_at?: string;
     stats?: PlayerStats[];
 }
 
@@ -431,20 +450,33 @@ export interface H2HResponse {
     player2_recent_form: RecentForm[];
 }
 
-// Rankings Types
-export interface RankingsResponse {
-    league: 'ATP' | 'WTA';
-    total: number;
-    players: Player[];
+// Rankings Types (backend returns DB columns: player_key, player_name, atp_ranking, atp_points, etc.)
+export interface RankedPlayer {
+    player_key: string | number;
+    player_name: string;
+    atp_ranking?: number | null;
+    atp_points?: number | null;
+    wta_ranking?: number | null;
+    wta_points?: number | null;
+    ranking_movement?: string | null;
+    country?: string | null;
+    player_logo?: string | null;
 }
 
-// Tournament Types
+export interface RankingsResponse {
+    league: 'ATP';
+    label?: string;  // ej. "ATP Individual masculino"
+    total: number;
+    players: RankedPlayer[];
+}
+
+// Tournament Types (backend may return tournament_key as string from DB)
 export interface Tournament {
-    tournament_key: number;
+    tournament_key: number | string;
     tournament_name: string;
-    event_type_key: number;
+    event_type_key?: number | string;
     event_type_type: string;
-    created_at: string;
+    created_at?: string;
 }
 
 export interface TournamentsResponse {

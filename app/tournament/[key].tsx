@@ -54,22 +54,26 @@ function MatchRow({ match, onPress }: MatchRowProps) {
 export default function TournamentDetailPage() {
     const router = useRouter();
     const params = useLocalSearchParams();
-    const tournamentKey = parseInt(params.key as string);
-    const tournamentName = params.name as string || 'Torneo';
+    const rawKey = params.key as string | undefined;
+    const tournamentKey = rawKey ? parseInt(rawKey, 10) : NaN;
+    const validKey = Number.isFinite(tournamentKey) ? tournamentKey : null;
+    const tournamentName = (params.name as string) || 'Torneo';
 
     const [data, setData] = useState<TournamentMatchesResponse | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        loadTournamentMatches();
-    }, [tournamentKey]);
+        if (validKey != null) loadTournamentMatches();
+        else setLoading(false);
+    }, [validKey]);
 
     const loadTournamentMatches = async () => {
+        if (validKey == null) return;
         setLoading(true);
         setError(null);
         try {
-            const matchesData = await fetchTournamentMatches(tournamentKey);
+            const matchesData = await fetchTournamentMatches(validKey);
             setData(matchesData);
         } catch (err: any) {
             console.error('Error loading tournament matches:', err);
@@ -85,6 +89,17 @@ export default function TournamentDetailPage() {
             params: { match: JSON.stringify(match) }
         } as any);
     };
+
+    if (validKey == null) {
+        return (
+            <View style={[styles.container, styles.loadingContainer]}>
+                <Text style={styles.errorText}>Torneo no válido</Text>
+                <TouchableOpacity onPress={() => router.back()} style={styles.retryButton}>
+                    <Text style={styles.retryButtonText}>Volver</Text>
+                </TouchableOpacity>
+            </View>
+        );
+    }
 
     return (
         <View style={styles.container}>

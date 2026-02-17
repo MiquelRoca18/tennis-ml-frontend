@@ -1,14 +1,23 @@
 import { Player, PlayerMatchesResponse, PlayerStatsResponse } from '../../types/api';
 import apiClient from './apiClient';
 
+/** Normalize backend player response (DB columns: country, atp_points) to Player shape */
+function normalizePlayer(data: Record<string, unknown>): Player {
+    return {
+        ...data,
+        player_country: (data.player_country ?? data.country) as string | null,
+        ranking_points: (data.ranking_points ?? data.atp_points ?? data.wta_points) as number | null,
+    } as Player;
+}
+
 /**
  * Fetch player profile
  * @param playerKey - Player ID
  * @returns Promise with player data
  */
 export const fetchPlayer = async (playerKey: number): Promise<Player> => {
-    const response = await apiClient.get<Player>(`/players/${playerKey}`);
-    return response.data;
+    const response = await apiClient.get<Record<string, unknown>>(`/players/${playerKey}`);
+    return normalizePlayer(response.data);
 };
 
 /**

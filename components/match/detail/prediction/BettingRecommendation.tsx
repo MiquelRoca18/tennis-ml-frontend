@@ -4,13 +4,16 @@ import { COLORS } from '../../../../src/utils/constants';
 
 interface BettingRecommendationProps {
     prediction: any;
+    /** Bankroll usado para el stake mostrado (opcional, para mostrar "según tu bankroll de X€") */
+    bankrollUsed?: number | null;
 }
 
-export default function BettingRecommendation({ prediction }: BettingRecommendationProps) {
+export default function BettingRecommendation({ prediction, bankrollUsed }: BettingRecommendationProps) {
     if (!prediction) return null;
 
     const recommendation = prediction.recomendacion || 'NO APOSTAR';
     const bestOption = prediction.mejor_opcion;
+    const stakeEur = (prediction.kelly_stake_jugador1 ?? 0) || (prediction.kelly_stake_jugador2 ?? 0);
 
     // Determine recommendation type
     const getRecommendationType = (rec: string): 'bet' | 'caution' | 'no-bet' => {
@@ -69,6 +72,15 @@ export default function BettingRecommendation({ prediction }: BettingRecommendat
                 </Text>
             )}
 
+            {type === 'bet' && stakeEur > 0 && (
+                <Text style={styles.stakeSuggested}>
+                    Cantidad sugerida: {stakeEur.toFixed(2)}€
+                    {bankrollUsed != null && bankrollUsed > 0 && (
+                        <Text style={styles.bankrollNote}> (bankroll {bankrollUsed.toFixed(0)}€)</Text>
+                    )}
+                </Text>
+            )}
+
             <Text style={styles.message}>{style.message}</Text>
         </View>
     );
@@ -112,6 +124,18 @@ const styles = StyleSheet.create({
         color: COLORS.textPrimary,
         marginBottom: 12,
         textAlign: 'center',
+    },
+    stakeSuggested: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: COLORS.primary,
+        marginBottom: 8,
+        textAlign: 'center',
+    },
+    bankrollNote: {
+        fontSize: 13,
+        fontWeight: '500',
+        color: COLORS.textSecondary,
     },
     message: {
         fontSize: 13,

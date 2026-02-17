@@ -4,7 +4,8 @@ import {
     PredictMatchRequest,
     PredictMatchResponse,
     UpdateResultRequest,
-    UpdateResultResponse
+    UpdateResultResponse,
+    BettingSettingsResponse,
 } from '../../types/api';
 import apiClient from './apiClient';
 
@@ -70,6 +71,23 @@ export const refreshOdds = async (
             },
         }
     );
+    return response.data;
+};
+
+/**
+ * Fetch betting settings (bankroll and limits)
+ */
+export const fetchBettingSettings = async (): Promise<BettingSettingsResponse> => {
+    const response = await apiClient.get<BettingSettingsResponse>('/settings/betting');
+    return response.data;
+};
+
+/**
+ * Update bankroll. Stakes shown per match are recalculated with this value.
+ * @param bankroll - New bankroll in euros
+ */
+export const updateBettingBankroll = async (bankroll: number): Promise<BettingSettingsResponse> => {
+    const response = await apiClient.patch<BettingSettingsResponse>('/settings/betting', { bankroll });
     return response.data;
 };
 

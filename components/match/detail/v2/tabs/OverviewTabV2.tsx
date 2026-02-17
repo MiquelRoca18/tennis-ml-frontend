@@ -272,31 +272,16 @@ function PredictionPreview({ prediction, p1Name, p2Name }: {
     p2Name: string;
 }) {
     const favorito = prediction.predicted_winner === 1 ? p1Name : p2Name;
-    const confianza = prediction.confidence;
 
     return (
         <View style={styles.card}>
             <Text style={styles.cardTitle}>🤖 Predicción ML</Text>
-            
             <View style={styles.predictionContent}>
                 <View style={styles.predictionMain}>
                     <Text style={styles.predictionLabel}>Favorito</Text>
                     <Text style={styles.predictionWinner}>{favorito}</Text>
                 </View>
-                
-                <View style={styles.predictionConfidence}>
-                    <Text style={styles.predictionConfidenceValue}>{confianza.toFixed(0)}%</Text>
-                    <Text style={styles.predictionConfidenceLabel}>Confianza</Text>
-                </View>
             </View>
-
-            {prediction.value_bet && (
-                <View style={styles.valueBetBadge}>
-                    <Text style={styles.valueBetText}>
-                        💎 Value Bet: {prediction.value_bet === 1 ? p1Name : p2Name}
-                    </Text>
-                </View>
-            )}
         </View>
     );
 }

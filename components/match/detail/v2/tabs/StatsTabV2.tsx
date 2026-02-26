@@ -47,11 +47,6 @@ export default function StatsTabV2({ data, scrollable = true }: StatsTabV2Props)
             setLoading(true);
             setError(null);
             const response = await apiClient.get<MatchStats>(`/v2/matches/${data.match.id}/stats`);
-            // DEBUG: Ver qué devuelve la API
-            if (__DEV__) {
-                console.log('[StatsTabV2] API /v2/matches/' + data.match.id + '/stats response:', JSON.stringify(response.data, null, 2));
-                console.log('[StatsTabV2] has_detailed_stats:', response.data?.has_detailed_stats);
-            }
             setStats(response.data);
         } catch (err: any) {
             setError('Error al cargar estadísticas');

@@ -13,12 +13,16 @@
  */
 
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import FavoriteButton from '../../../ui/FavoriteButton';
 import { useIsFavorite } from '../../../../src/hooks/useFavorites';
+import { fetchPlayerLookup } from '../../../../src/services/api/playerService';
 import { MatchFullResponse, getShortName } from '../../../../src/types/matchDetail';
 import { COLORS } from '../../../../src/utils/constants';
 import { getCountryFlag } from '../../../../src/utils/countryUtils';
+import { isMatchStarted } from '../../../../src/utils/dateUtils';
+import { SOLO_RESULTADO_FINAL_STATUS } from '../../../../src/utils/formatters';
 import LiveBadge from '../../LiveBadge';
 import PlayerLogo from '../../PlayerLogo';
 
@@ -56,11 +60,14 @@ interface MatchHeroV2Props {
 }
 
 export default function MatchHeroV2({ data }: MatchHeroV2Props) {
+    const router = useRouter();
     const { match, player1, player2, winner, scores } = data;
     const { favorited, loading: favLoading, toggle } = useIsFavorite(match.id);
     const isLive = match.status === 'en_juego';
     const isCompleted = match.status === 'completado';
     const isPending = match.status === 'pendiente';
+    const hasStarted = isMatchStarted(match.date, match.time ?? null);
+    const noLiveDataButStarted = hasStarted && isPending;
 
     // Scores (resultado en sets; si no hay, 0-0)
     const setsWon = scores?.sets_won || [0, 0];
@@ -73,25 +80,41 @@ export default function MatchHeroV2({ data }: MatchHeroV2Props) {
         /retired|ret|walk|w\.o|w\/o|default/i.test(match.event_status)
     );
 
+    const handlePlayerPress = async (playerKey: string | number | null | undefined, playerName: string) => {
+        const key = playerKey != null ? String(playerKey).trim() : '';
+        const numericKey = key ? parseInt(key, 10) : NaN;
+        if (key && Number.isFinite(numericKey)) {
+            router.push({ pathname: '/player/[key]', params: { key } } as any);
+            return;
+        }
+        if (!playerName || !playerName.trim()) return;
+        try {
+            const resolvedKey = await fetchPlayerLookup(playerName.trim());
+            if (resolvedKey != null) {
+                router.push({ pathname: '/player/[key]', params: { key: String(resolvedKey) } } as any);
+            }
+        } catch {
+            // Silently ignore lookup failure
+        }
+    };
+
     return (
         <View style={styles.container}>
             {/* Tournament Info */}
             <View style={styles.tournamentSection}>
                 <View style={styles.tournamentRow}>
                     <Text style={styles.tournamentName}>{match.tournament}</Text>
-                    {!favLoading && (
-                        <FavoriteButton
-                            isFavorite={favorited}
-                            onPress={() =>
-                                toggle({
-                                    player1Name: player1.name,
-                                    player2Name: player2.name,
-                                    tournament: match.tournament ?? '',
-                                })
-                            }
-                            size={28}
-                        />
-                    )}
+                    <FavoriteButton
+                        isFavorite={favorited}
+                        onPress={() =>
+                            toggle({
+                                player1Name: player1.name,
+                                player2Name: player2.name,
+                                tournament: match.tournament ?? '',
+                            })
+                        }
+                        size={28}
+                    />
                 </View>
                 <View style={styles.metaRow}>
                     <View style={styles.surfaceBadge}>
@@ -106,7 +129,11 @@ export default function MatchHeroV2({ data }: MatchHeroV2Props) {
             {/* Main Score Section */}
             <View style={styles.scoreSection}>
                 {/* Player 1 */}
-                <View style={styles.playerColumn}>
+                <TouchableOpacity
+                    style={styles.playerColumn}
+                    onPress={() => handlePlayerPress(player1.player_key, player1.name)}
+                    activeOpacity={0.7}
+                >
                     <PlayerLogo logoUrl={player1.logo_url ?? undefined} size={72} />
                     <View style={styles.playerInfo}>
                         {player1.country && (
@@ -125,7 +152,7 @@ export default function MatchHeroV2({ data }: MatchHeroV2Props) {
                             <Text style={styles.ranking}>#{player1.ranking}</Text>
                         )}
                     </View>
-                </View>
+                </TouchableOpacity>
 
                 {/* Center Score */}
                 <View style={styles.centerScore}>
@@ -134,7 +161,18 @@ export default function MatchHeroV2({ data }: MatchHeroV2Props) {
                     {isPending ? (
                         <View style={styles.vsContainer}>
                             <Text style={styles.vsText}>VS</Text>
-                            <Text style={styles.statusText}>PROGRAMADO</Text>
+                            {noLiveDataButStarted ? (
+                                <View style={styles.soloResultadoBox}>
+                                    <Text style={[styles.soloResultadoTitle, { color: SOLO_RESULTADO_FINAL_STATUS.color }]}>
+                                        {SOLO_RESULTADO_FINAL_STATUS.emoji} {SOLO_RESULTADO_FINAL_STATUS.text}
+                                    </Text>
+                                    <Text style={styles.soloResultadoSubtitle} numberOfLines={2}>
+                                        No hay datos en directo. Resultado al finalizar.
+                                    </Text>
+                                </View>
+                            ) : (
+                                <Text style={styles.statusText}>PROGRAMADO</Text>
+                            )}
                         </View>
                     ) : (
                         <View style={styles.mainScore}>
@@ -178,7 +216,11 @@ export default function MatchHeroV2({ data }: MatchHeroV2Props) {
                 </View>
 
                 {/* Player 2 */}
-                <View style={styles.playerColumn}>
+                <TouchableOpacity
+                    style={styles.playerColumn}
+                    onPress={() => handlePlayerPress(player2.player_key, player2.name)}
+                    activeOpacity={0.7}
+                >
                     <PlayerLogo logoUrl={player2.logo_url ?? undefined} size={72} />
                     <View style={styles.playerInfo}>
                         {player2.country && (
@@ -197,7 +239,7 @@ export default function MatchHeroV2({ data }: MatchHeroV2Props) {
                             <Text style={styles.ranking}>#{player2.ranking}</Text>
                         )}
                     </View>
-                </View>
+                </TouchableOpacity>
             </View>
 
             {/* Resumen de juegos por set cuando el partido está finalizado (o en vivo) */}
@@ -391,12 +433,13 @@ const styles = StyleSheet.create({
         color: COLORS.textSecondary,
     },
 
-    // Center Score
+    // Center Score (ancho fijo para no desplazar jugadores)
     centerScore: {
         alignItems: 'center',
         justifyContent: 'center',
-        paddingHorizontal: 16,
-        minWidth: 120,
+        paddingHorizontal: 8,
+        minWidth: 100,
+        maxWidth: 140,
     },
     vsContainer: {
         alignItems: 'center',
@@ -458,6 +501,25 @@ const styles = StyleSheet.create({
         color: COLORS.textSecondary,
         letterSpacing: 1,
         marginTop: 4,
+    },
+    soloResultadoBox: {
+        maxWidth: 130,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 4,
+    },
+    soloResultadoTitle: {
+        fontSize: 10,
+        fontWeight: '700',
+        letterSpacing: 0.3,
+        textAlign: 'center',
+    },
+    soloResultadoSubtitle: {
+        fontSize: 9,
+        color: COLORS.textSecondary,
+        marginTop: 4,
+        textAlign: 'center',
+        lineHeight: 12,
     },
 
     // Resumen de juegos por set (finalizado / en vivo)

@@ -16,7 +16,16 @@ export default function MatchDetailScreen() {
     const [matchTitle, setMatchTitle] = useState<string>('Partido');
 
     useEffect(() => {
-        // Parse match data from params to get ID
+        // ID puede venir de params.id (ej. desde perfil jugador → próximo partido) o de params.match
+        const paramId = params.id as string | undefined;
+        if (paramId != null && paramId !== '') {
+            const id = parseInt(paramId, 10);
+            if (Number.isFinite(id)) {
+                setMatchId(id);
+                setMatchTitle('Partido');
+                return;
+            }
+        }
         if (params.match) {
             try {
                 const matchData = JSON.parse(params.match as string);
@@ -26,7 +35,7 @@ export default function MatchDetailScreen() {
                 console.error('Error parsing match data:', e);
             }
         }
-    }, [params.match]);
+    }, [params.id, params.match]);
 
     return (
         <View style={styles.container}>

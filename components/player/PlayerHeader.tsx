@@ -8,6 +8,20 @@ interface PlayerHeaderProps {
     player: Player;
 }
 
+/** Formatea player_bday tipo "11.02.1996" a "11 feb 1996" */
+function formatBirthday(bday: string): string {
+    if (!bday || !bday.trim()) return '';
+    const parts = bday.trim().split(/[.\-/]/);
+    if (parts.length >= 3) {
+        const [d, m, y] = parts;
+        const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+        const mi = parseInt(m, 10);
+        const month = mi >= 1 && mi <= 12 ? months[mi - 1] : m;
+        return `${d} ${month} ${y}`;
+    }
+    return bday;
+}
+
 function getRankingMovementIcon(movement: 'up' | 'down' | 'same' | null) {
     switch (movement) {
         case 'up':
@@ -45,14 +59,24 @@ export default function PlayerHeader({ player }: PlayerHeaderProps) {
             {/* Player Logo */}
             <View style={styles.logoContainer}>
                 <PlayerLogo
-                    logo={player.player_logo ?? undefined}
+                    logoUrl={typeof player.player_logo === 'string' ? player.player_logo : undefined}
+                    logo={typeof player.player_logo === 'string' ? player.player_logo : undefined}
                     name={player.player_name}
                     size={100}
                 />
             </View>
 
             {/* Player Name */}
-            <Text style={styles.name}>{player.player_name}</Text>
+            <Text style={styles.name}>
+                {player.player_full_name || player.player_name}
+            </Text>
+
+            {/* Birthday */}
+            {(player.player_bday || player.player_birthday) ? (
+                <Text style={styles.birthday}>
+                    Nacimiento: {formatBirthday(player.player_bday || player.player_birthday)}
+                </Text>
+            ) : null}
 
             {/* Country */}
             {country ? (
@@ -123,6 +147,11 @@ const styles = StyleSheet.create({
         fontWeight: '500',
         color: COLORS.textSecondary,
         marginBottom: 16,
+    },
+    birthday: {
+        fontSize: 13,
+        color: COLORS.textSecondary,
+        marginBottom: 8,
     },
     rankingContainer: {
         flexDirection: 'row',

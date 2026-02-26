@@ -3,8 +3,10 @@ import { StyleSheet, Text, View } from 'react-native';
 import { COLORS } from '../../../src/utils/constants';
 import { getCountryFlag } from '../../../src/utils/countryUtils';
 import { formatMatchTime } from '../../../src/utils/formatters';
+import { isMatchStarted } from '../../../src/utils/dateUtils';
 import LiveBadge from '../LiveBadge';
 import PlayerLogo from '../PlayerLogo';
+import { SOLO_RESULTADO_FINAL_STATUS } from '../../../src/utils/formatters';
 
 interface MatchHeroProps {
     match: any;
@@ -16,6 +18,9 @@ export default function MatchHero({ match, matchDetails }: MatchHeroProps) {
     const isLive = is_live === '1' || estado === 'en_juego';
     const isCompleted = estado === 'completado';
     const isPending = estado === 'pendiente';
+    const fechaStr = (typeof fecha_partido === 'string' ? fecha_partido : (fecha_partido as Date)?.toISOString?.()?.slice(0, 10) ?? '').slice(0, 10);
+    const hasStarted = Boolean(fechaStr) && isMatchStarted(fechaStr, hora_inicio ?? null);
+    const noLiveDataButStarted = hasStarted && isPending;
 
     // Get live data if available
     const liveData = resultado?.scores?.live;
@@ -116,7 +121,14 @@ export default function MatchHero({ match, matchDetails }: MatchHeroProps) {
                     {isPending ? (
                         <View style={styles.vsContainer}>
                             <Text style={styles.vsText}>VS</Text>
-                            <Text style={styles.statusText}>PROGRAMADO</Text>
+                            {noLiveDataButStarted ? (
+                                <>
+                                    <Text style={[styles.statusText, { color: SOLO_RESULTADO_FINAL_STATUS.color }]}>{SOLO_RESULTADO_FINAL_STATUS.emoji} {SOLO_RESULTADO_FINAL_STATUS.text}</Text>
+                                    <Text style={styles.srfSubtitle}>No hay datos en directo. El resultado se mostrará al finalizar.</Text>
+                                </>
+                            ) : (
+                                <Text style={styles.statusText}>PROGRAMADO</Text>
+                            )}
                         </View>
                     ) : score ? (
                         <View style={styles.scoreWrapper}>
@@ -318,6 +330,13 @@ const styles = StyleSheet.create({
         color: COLORS.textSecondary,
         letterSpacing: 1,
         marginTop: 8,
+    },
+    srfSubtitle: {
+        fontSize: 10,
+        color: COLORS.textSecondary,
+        marginTop: 4,
+        textAlign: 'center',
+        paddingHorizontal: 8,
     },
     scoreWrapper: {
         alignItems: 'center',

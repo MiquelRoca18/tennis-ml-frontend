@@ -19,7 +19,7 @@ export interface CuotasTop3 {
 
 export interface Player {
     nombre: string;
-    key: string;              // 🆕 ID del jugador en API-Tennis
+    key?: string | null;      // ID del jugador en API-Tennis (opcional si el partido no tiene keys en BD)
     ranking: number | null;
     cuota: number;
     logo: string;             // 🆕 URL del logo del jugador
@@ -344,12 +344,14 @@ export interface MatchAnalysisResponse extends MatchDetailsResponse {
 // ELITE API TYPES
 // ============================================
 
-// Player Types (profile from GET /players/:key - backend returns DB columns: country, atp_points, etc.)
+// Player Types (profile from GET /players/:key - backend returns DB columns + API-Tennis stats/tournaments)
 export interface Player {
     player_key: number | string;
     player_name: string;
+    player_full_name?: string | null;
     player_country?: string | null;
     country?: string | null;  // backend DB column name
+    player_bday?: string | null;
     player_birthday?: string | null;
     player_logo?: string | null;
     atp_ranking?: number | null;
@@ -360,22 +362,34 @@ export interface Player {
     ranking_points?: number | null;  // display: atp_points or wta_points
     last_updated?: string;
     created_at?: string;
-    stats?: PlayerStats[];
+    /** Stats from API-Tennis get_players (singles/doubles by season) */
+    stats?: ApiPlayerStat[];
+    /** Tournaments from API-Tennis get_players */
+    tournaments?: PlayerTournament[];
 }
 
-export interface PlayerStats {
-    season: number;
-    type: 'singles' | 'doubles';
-    rank: number;
-    titles: number;
-    matches_won: number;
-    matches_lost: number;
-    hard_won: number;
-    hard_lost: number;
-    clay_won: number;
-    clay_lost: number;
-    grass_won: number;
-    grass_lost: number;
+/** One season/type stat from API-Tennis (numbers can come as strings) */
+export interface ApiPlayerStat {
+    season: string;
+    type: string;
+    rank?: string | number;
+    titles?: string | number;
+    matches_won?: string | number;
+    matches_lost?: string | number;
+    hard_won?: string | number;
+    hard_lost?: string | number;
+    clay_won?: string | number;
+    clay_lost?: string | number;
+    grass_won?: string | number;
+    grass_lost?: string | number;
+}
+
+export interface PlayerTournament {
+    name: string;
+    season: string;
+    type: string;
+    surface: string;
+    prize?: string;
 }
 
 export interface PlayerMatch {
@@ -385,6 +399,12 @@ export interface PlayerMatch {
     superficie: string;
     jugador1_nombre: string;
     jugador2_nombre: string;
+    /** Rival del jugador del perfil (backend lo rellena por player_key) */
+    opponent_name?: string;
+    /** Si el jugador del perfil ganó (backend lo rellena por player_key) */
+    is_win?: boolean;
+    /** true = perfil es jugador1 (primer número del marcador) */
+    profile_is_jugador1?: boolean;
     resultado_ganador: string | null;
     resultado_marcador: string | null;
     estado: MatchState;
@@ -394,6 +414,23 @@ export interface PlayerMatchesResponse {
     player_key: number;
     total_matches: number;
     matches: PlayerMatch[];
+}
+
+export interface PlayerUpcomingMatch {
+    event_key: number | string | null;
+    date: string;
+    time: string;
+    opponent_name: string;
+    tournament_name: string;
+    round: string;
+    event_type_type?: string;
+    /** ID del partido en nuestra BD cuando existe (para abrir detalle) */
+    match_id?: number | null;
+}
+
+export interface PlayerUpcomingResponse {
+    player_key: number;
+    upcoming: PlayerUpcomingMatch[];
 }
 
 export interface PlayerStatsResponse {

@@ -47,6 +47,14 @@ export function addDays(date: Date, days: number): Date {
 }
 
 /**
+ * Dada una fecha YYYY-MM-DD, devuelve la fecha N días antes/después en YYYY-MM-DD.
+ */
+export function addDaysToDateString(dateString: string, days: number): string {
+    const d = parseLocalDate(dateString);
+    return formatDateToISO(addDays(d, days));
+}
+
+/**
  * Check if a date string is today
  */
 export function isToday(dateString: string): boolean {

@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     FlatList,
@@ -8,51 +8,34 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fetchTournamentMatches } from '../../src/services/api/tournamentService';
 import { Match, TournamentMatchesResponse } from '../../src/types/api';
 import { COLORS } from '../../src/utils/constants';
-import { formatMatchStatus } from '../../src/utils/formatters';
+import MatchCard from '../../components/match/MatchCard';
+import DateSelector from '../../components/match/DateSelector';
+import { getTodayDate } from '../../src/utils/dateUtils';
 
-interface MatchRowProps {
-    match: Match;
-    onPress: () => void;
-}
-
-function MatchRow({ match, onPress }: MatchRowProps) {
-    const matchStatus = formatMatchStatus(match.estado);
-
-    return (
-        <TouchableOpacity
-            style={styles.matchRow}
-            onPress={onPress}
-            activeOpacity={0.7}
-        >
-            <View style={styles.matchInfo}>
-                <Text style={styles.players}>
-                    {match.jugador1.nombre} vs {match.jugador2.nombre}
-                </Text>
-                <View style={styles.matchDetails}>
-                    <Text style={styles.round}>{match.ronda || 'Ronda'}</Text>
-                    <Text style={styles.dot}>•</Text>
-                    <Text style={styles.surface}>{match.superficie}</Text>
-                </View>
-            </View>
-
-            <View style={styles.statusContainer}>
-                {match.estado === 'completado' && match.resultado ? (
-                    <Text style={styles.score}>{match.resultado.marcador}</Text>
-                ) : (
-                    <Text style={[styles.status, { color: matchStatus.color }]}>
-                        {matchStatus.emoji} {matchStatus.text}
-                    </Text>
-                )}
-            </View>
-        </TouchableOpacity>
-    );
+/** Ordenar partidos: en vivo primero, luego por fecha y hora */
+function sortMatchesByDateAndTime(matches: Match[]): Match[] {
+    return [...matches].sort((a, b) => {
+        const aLive = a.estado === 'en_juego' || Boolean(a.is_live);
+        const bLive = b.estado === 'en_juego' || Boolean(b.is_live);
+        if (aLive && !bLive) return -1;
+        if (!aLive && bLive) return 1;
+        const dateA = (a.fecha_partido || '').slice(0, 10);
+        const dateB = (b.fecha_partido || '').slice(0, 10);
+        const cmpDate = dateA.localeCompare(dateB);
+        if (cmpDate !== 0) return cmpDate;
+        const timeA = a.hora_inicio || '23:59';
+        const timeB = b.hora_inicio || '23:59';
+        return timeA.localeCompare(timeB);
+    });
 }
 
 export default function TournamentDetailPage() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const params = useLocalSearchParams();
     const rawKey = params.key as string | undefined;
     const tournamentKey = rawKey ? parseInt(rawKey, 10) : NaN;
@@ -62,6 +45,40 @@ export default function TournamentDetailPage() {
     const [data, setData] = useState<TournamentMatchesResponse | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    /** Fecha seleccionada en el selector de días (YYYY-MM-DD) */
+    const [selectedDate, setSelectedDate] = useState<string>('');
+
+    /** Días con partidos en el torneo, ordenados, para el DateSelector */
+    const tournamentDates = useMemo(() => {
+        if (!data?.matches?.length) return [];
+        const keys = new Set<string>();
+        for (const m of data.matches) {
+            const key = (m.fecha_partido || '').slice(0, 10);
+            if (key) keys.add(key);
+        }
+        return Array.from(keys).sort((a, b) => a.localeCompare(b));
+    }, [data?.matches]);
+
+    /** Al cargar datos, seleccionar el primer día o hoy si está en el torneo */
+    const tournamentDatesKey = tournamentDates.join(',');
+    useEffect(() => {
+        if (tournamentDates.length === 0) return;
+        const today = getTodayDate();
+        if (tournamentDates.includes(today)) {
+            setSelectedDate(today);
+        } else {
+            setSelectedDate(tournamentDates[0]);
+        }
+    }, [tournamentDatesKey]);
+
+    /** Partidos del día seleccionado, ordenados por hora */
+    const matchesForSelectedDay = useMemo(() => {
+        if (!data?.matches?.length) return [];
+        const dateToUse = selectedDate || tournamentDates[0];
+        if (!dateToUse) return [];
+        const ofDay = data.matches.filter((m) => (m.fecha_partido || '').slice(0, 10) === dateToUse);
+        return sortMatchesByDateAndTime(ofDay);
+    }, [data?.matches, selectedDate, tournamentDates]);
 
     useEffect(() => {
         if (validKey != null) loadTournamentMatches();
@@ -86,7 +103,7 @@ export default function TournamentDetailPage() {
     const handleMatchPress = (match: Match) => {
         router.push({
             pathname: '/match/[id]',
-            params: { match: JSON.stringify(match) }
+            params: { id: match.id.toString(), match: JSON.stringify(match) },
         } as any);
     };
 
@@ -104,7 +121,7 @@ export default function TournamentDetailPage() {
     return (
         <View style={styles.container}>
             {/* Header */}
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: Math.max(16, insets.top) }]}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
                     <Text style={styles.backText}>← Volver</Text>
                 </TouchableOpacity>
@@ -139,14 +156,32 @@ export default function TournamentDetailPage() {
                         )}
                     </View>
 
+                    <DateSelector
+                        dates={tournamentDates}
+                        selectedDate={selectedDate || tournamentDates[0] || ''}
+                        onDateSelect={setSelectedDate}
+                    />
+
                     <FlatList
-                        data={data.matches}
+                        data={matchesForSelectedDay}
                         keyExtractor={(item) => item.id.toString()}
                         renderItem={({ item }) => (
-                            <MatchRow match={item} onPress={() => handleMatchPress(item)} />
+                            <MatchCard
+                                match={item}
+                                onPress={() => handleMatchPress(item)}
+                            />
                         )}
                         contentContainerStyle={styles.listContent}
                         showsVerticalScrollIndicator={false}
+                        ListEmptyComponent={
+                            selectedDate ? (
+                                <View style={styles.emptyDay}>
+                                    <Text style={styles.emptyDayText}>
+                                        No hay partidos este día
+                                    </Text>
+                                </View>
+                            ) : null
+                        }
                     />
                 </>
             ) : (
@@ -170,8 +205,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 16,
-        paddingVertical: 16,
-        paddingTop: 60,
+        paddingBottom: 16,
         borderBottomWidth: 1,
         borderBottomColor: COLORS.border,
         backgroundColor: COLORS.surface,
@@ -207,59 +241,17 @@ const styles = StyleSheet.create({
         color: COLORS.textSecondary,
     },
     listContent: {
-        padding: 16,
-        gap: 8,
+        paddingVertical: 16,
+        paddingHorizontal: 0,
     },
-    matchRow: {
-        flexDirection: 'row',
+    emptyDay: {
+        paddingVertical: 32,
         alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: 16,
-        backgroundColor: COLORS.surface,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: COLORS.border,
     },
-    matchInfo: {
-        flex: 1,
-        gap: 6,
-        marginRight: 12,
-    },
-    players: {
+    emptyDayText: {
         fontSize: 14,
-        fontWeight: '700',
-        color: COLORS.textPrimary,
-    },
-    matchDetails: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-    },
-    round: {
-        fontSize: 12,
-        fontWeight: '500',
         color: COLORS.textSecondary,
-    },
-    dot: {
-        fontSize: 12,
-        color: COLORS.textSecondary,
-    },
-    surface: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: COLORS.textSecondary,
-    },
-    statusContainer: {
-        alignItems: 'flex-end',
-    },
-    score: {
-        fontSize: 13,
-        fontWeight: '700',
-        color: COLORS.textPrimary,
-    },
-    status: {
-        fontSize: 12,
-        fontWeight: '600',
+        fontStyle: 'italic',
     },
     loadingContainer: {
         flex: 1,

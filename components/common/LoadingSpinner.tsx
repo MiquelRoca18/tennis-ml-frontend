@@ -6,7 +6,7 @@ interface LoadingSpinnerProps {
     message?: string;
 }
 
-export default function LoadingSpinner({ message = 'Cargando predicciones...' }: LoadingSpinnerProps) {
+export default function LoadingSpinner({ message = 'Cargando...' }: LoadingSpinnerProps) {
     return (
         <View style={styles.container}>
             <ActivityIndicator size="large" color={COLORS.primary} />

@@ -12,7 +12,8 @@ interface PlayerLogoProps {
 
 export default function PlayerLogo({ logo, logoUrl, name = '', size = 40, style }: PlayerLogoProps) {
     const [imageError, setImageError] = useState(false);
-    const imageUrl = logoUrl || logo;
+    const rawUrl = logoUrl || logo;
+    const imageUrl = typeof rawUrl === 'string' && rawUrl.trim() ? rawUrl.trim() : null;
 
     // Get player initials for fallback
     const getInitials = (playerName: string): string => {
@@ -79,6 +80,7 @@ export default function PlayerLogo({ logo, logoUrl, name = '', size = 40, style 
             ]}
         >
             <Image
+                key={imageUrl}
                 source={{ uri: imageUrl }}
                 style={{
                     width: size,

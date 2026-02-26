@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import {
   ActivityIndicator,
@@ -7,6 +7,7 @@ import {
   RefreshControl,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -38,6 +39,7 @@ export default function TournamentsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -57,6 +59,17 @@ export default function TournamentsScreen() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const tournaments = data?.tournaments ?? [];
+  const filteredTournaments = useMemo(() => {
+    if (!searchQuery.trim()) return tournaments;
+    const q = searchQuery.trim().toLowerCase();
+    return tournaments.filter(
+      (t) =>
+        (t.tournament_name || '').toLowerCase().includes(q) ||
+        (t.event_type_type || '').toLowerCase().includes(q)
+    );
+  }, [tournaments, searchQuery]);
 
   if (loading && !data) {
     return (
@@ -78,13 +91,34 @@ export default function TournamentsScreen() {
     );
   }
 
-  const tournaments = data?.tournaments ?? [];
-
   return (
     <View style={styles.container}>
       <FlatList
-        data={tournaments}
+        data={filteredTournaments}
         keyExtractor={(item) => String(item.tournament_key)}
+        ListHeaderComponent={
+          <View style={styles.header}>
+            <View style={styles.searchRow}>
+              <Ionicons name="search" size={20} color={COLORS.textSecondary} style={styles.searchIcon} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Buscar torneo..."
+                placeholderTextColor={COLORS.textSecondary}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                returnKeyType="search"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              {searchQuery.length > 0 ? (
+                <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={12} style={styles.clearBtn}>
+                  <Ionicons name="close-circle" size={20} color={COLORS.textSecondary} />
+                </TouchableOpacity>
+              ) : null}
+            </View>
+            <Text style={styles.headerSubtitle}>Individuales masculinos (ATP, Challenger, ITF)</Text>
+          </View>
+        }
         renderItem={({ item }) => (
           <TournamentRow
             tournament={item}
@@ -101,7 +135,9 @@ export default function TournamentsScreen() {
         }
         ListEmptyComponent={
           <Text style={styles.emptyText}>
-            No hay torneos. Sincroniza desde el panel de administración (POST /tournaments/sync).
+            {searchQuery.trim()
+              ? 'Ningún torneo coincide con la búsqueda.'
+              : 'No hay torneos. Sincroniza desde el panel de administración (POST /tournaments/sync).'}
           </Text>
         }
       />
@@ -111,6 +147,39 @@ export default function TournamentsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
+  header: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 12,
+    backgroundColor: COLORS.background,
+  },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingHorizontal: 12,
+    marginBottom: 8,
+  },
+  searchIcon: {
+    marginRight: 10,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: COLORS.textPrimary,
+  },
+  clearBtn: {
+    padding: 4,
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    fontWeight: '500',
+  },
   centered: {
     flex: 1,
     justifyContent: 'center',

@@ -139,6 +139,16 @@ export const formatMatchState = (estado: string): string => {
 };
 
 /**
+ * Estado mostrado en el detalle cuando el partido ya ha empezado pero no hay datos en directo
+ * (la API no aporta livescore). Solo se usa en vista detalle; en la card se muestra LIVE.
+ */
+export const SOLO_RESULTADO_FINAL_STATUS = {
+    emoji: '📋',
+    text: 'Solo Resultado Final',
+    color: '#757575',
+} as const;
+
+/**
  * Format match status with emoji and color
  * @param estado - Match state
  * @returns Object with emoji, text, and color

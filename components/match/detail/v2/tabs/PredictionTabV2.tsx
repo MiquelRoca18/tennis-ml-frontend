@@ -9,11 +9,10 @@
  */
 
 import React, { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useAuth } from '../../../../../src/contexts/AuthContext';
-import { addBet } from '../../../../../src/services/betsService';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MatchFullResponse, getShortName } from '../../../../../src/types/matchDetail';
 import { COLORS } from '../../../../../src/utils/constants';
+import RegisterBetModal from '../../../RegisterBetModal';
 
 interface PredictionTabV2Props {
     data: MatchFullResponse;
@@ -23,7 +22,6 @@ interface PredictionTabV2Props {
 }
 
 export default function PredictionTabV2({ data, scrollable = true, onBetPlaced }: PredictionTabV2Props) {
-    const { user } = useAuth();
     const { prediction, player1, player2, odds, match: matchInfo } = data;
 
     const p1Short = getShortName(player1.name);
@@ -52,50 +50,11 @@ export default function PredictionTabV2({ data, scrollable = true, onBetPlaced }
     const bankrollUsed = prediction.bankroll_used ?? 0;
     const hasStake = stakeEur > 0;
     const recommendationText = prediction.recommendation ?? (prediction as { recomendacion?: string }).recomendacion ?? '';
-    const [betLoading, setBetLoading] = useState(false);
+    const [showRegisterBetModal, setShowRegisterBetModal] = useState(false);
 
-    const handleRegisterBet = async () => {
+    const openRegisterBetModal = () => {
         if (!hasStake || stakeEur <= 0 || !matchInfo?.id) return;
-        Alert.alert(
-            'Registrar apuesta',
-            `¿Registrar apuesta de ${stakeEur.toFixed(2)}€?\nSe restará del bankroll (${bankrollUsed.toFixed(0)}€ → ${(bankrollUsed - stakeEur).toFixed(0)}€). Las siguientes cantidades sugeridas usarán el nuevo bankroll.`,
-            [
-                { text: 'Cancelar', style: 'cancel' },
-                {
-                    text: 'Apostar',
-                    onPress: async () => {
-                        setBetLoading(true);
-                        try {
-                            const result = await addBet(
-                                {
-                                    matchId: matchInfo.id,
-                                    stakeEur,
-                                    player1Name: player1.name,
-                                    player2Name: player2.name,
-                                    tournament: matchInfo.tournament ?? '',
-                                },
-                                user?.id
-                            );
-                            if (!result.success) {
-                                Alert.alert('Error', result.error ?? 'No se pudo registrar la apuesta');
-                                return;
-                            }
-                            onBetPlaced?.();
-                            Alert.alert(
-                                'Apuesta registrada',
-                                result.bankrollAfter != null
-                                    ? `Bankroll actualizado: ${result.bankrollAfter.toFixed(0)}€`
-                                    : 'Apuesta guardada. Verás el nuevo bankroll al refrescar.'
-                            );
-                        } catch (e: any) {
-                            Alert.alert('Error', e.message || 'No se pudo registrar la apuesta');
-                        } finally {
-                            setBetLoading(false);
-                        }
-                    },
-                },
-            ]
-        );
+        setShowRegisterBetModal(true);
     };
 
     const content = (
@@ -175,15 +134,27 @@ export default function PredictionTabV2({ data, scrollable = true, onBetPlaced }
             {/* Botón Registrar apuesta */}
             {hasStake && matchInfo?.id && (
                 <TouchableOpacity
-                    style={[styles.betButton, betLoading && styles.betButtonDisabled]}
-                    onPress={handleRegisterBet}
-                    disabled={betLoading}
+                    style={styles.betButton}
+                    onPress={openRegisterBetModal}
                 >
                     <Text style={styles.betButtonText}>
-                        {betLoading ? 'Registrando...' : `Registrar apuesta (${stakeEur.toFixed(2)}€)`}
+                        Registrar apuesta ({stakeEur.toFixed(2)}€)
                     </Text>
                 </TouchableOpacity>
             )}
+
+            <RegisterBetModal
+                visible={showRegisterBetModal}
+                onClose={() => setShowRegisterBetModal(false)}
+                onSuccess={onBetPlaced}
+                matchId={matchInfo!.id}
+                player1Name={player1.name}
+                player2Name={player2.name}
+                recommendedPlayerSide={prediction.recommended_bet_side ?? prediction.predicted_winner}
+                suggestedStakeEur={stakeEur}
+                bankrollEur={bankrollUsed}
+                tournament={matchInfo?.tournament ?? ''}
+            />
 
             {/* Model Info */}
             <View style={styles.modelInfo}>

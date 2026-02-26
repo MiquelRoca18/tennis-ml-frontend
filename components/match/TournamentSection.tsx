@@ -9,8 +9,10 @@ import {
     UIManager,
     View,
 } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import { Match } from '../../src/types/api';
 import { COLORS } from '../../src/utils/constants';
+import { isMatchStarted } from '../../src/utils/dateUtils';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -49,8 +51,10 @@ export default function TournamentSection({
         }
     };
 
-    // Count live matches
-    const liveCount = matches.filter(m => m.estado === 'en_juego').length;
+    // Count live matches (con datos API o ya empezados sin datos)
+    const liveCount = matches.filter(m =>
+        m.estado === 'en_juego' || (isMatchStarted(m.fecha_partido, m.hora_inicio) && m.estado === 'pendiente')
+    ).length;
 
     return (
         <View style={styles.container}>
@@ -60,36 +64,45 @@ export default function TournamentSection({
                 onPress={toggleExpand}
                 activeOpacity={0.7}
             >
-                <View style={styles.headerLeft}>
+                <View style={styles.headerTopRow}>
                     <Text style={styles.chevron}>{isExpanded ? '▼' : '▶'}</Text>
-                    <View style={styles.tournamentInfo}>
-                        <View style={styles.tournamentNameRow}>
-                            <Text style={styles.tournamentName} numberOfLines={1}>
-                                {tournamentName}
-                            </Text>
-                            {tournamentKey ? (
-                                <TouchableOpacity
-                                    onPress={(e) => { e?.stopPropagation?.(); goToTournament(); }}
-                                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                                    style={styles.tournamentLink}
-                                >
+                    <Text style={styles.tournamentName} numberOfLines={1}>
+                        {tournamentName}
+                    </Text>
+                    <View style={styles.headerRightGroup}>
+                        {tournamentKey ? (
+                            <TouchableOpacity
+                                onPress={(e) => { e?.stopPropagation?.(); goToTournament(); }}
+                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                style={styles.tournamentLink}
+                                activeOpacity={0.8}
+                            >
+                                <View style={styles.tournamentLinkContent}>
+                                    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={COLORS.primary} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={styles.trophyIcon}>
+                                        <Path d="M8 21l8 0" />
+                                        <Path d="M12 17l0 4" />
+                                        <Path d="M7 4l10 0" />
+                                        <Path d="M17 4v8a5 5 0 0 1 -10 0v-8" />
+                                        <Path d="M3 9a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+                                        <Path d="M17 9a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+                                    </Svg>
                                     <Text style={styles.tournamentLinkText}>Ver torneo</Text>
-                                </TouchableOpacity>
-                            ) : null}
+                                </View>
+                            </TouchableOpacity>
+                        ) : null}
+                        {liveCount > 0 && (
+                            <View style={[styles.badge, styles.badgeLive]}>
+                                <Text style={styles.badgeText}>{liveCount} 🔴</Text>
+                            </View>
+                        )}
+                        <View style={styles.badge}>
+                            <Text style={styles.badgeTextSecondary}>{matches.length}</Text>
                         </View>
-                        <Text style={styles.surface}>{surface}</Text>
                     </View>
                 </View>
-
-                <View style={styles.headerRight}>
-                    {liveCount > 0 && (
-                        <View style={[styles.badge, styles.badgeLive]}>
-                            <Text style={styles.badgeText}>{liveCount} 🔴</Text>
-                        </View>
-                    )}
-                    <View style={styles.badge}>
-                        <Text style={styles.badgeTextSecondary}>{matches.length}</Text>
-                    </View>
+                <View style={styles.headerBottomRow}>
+                    <View style={styles.chevronSpacer} />
+                    <Text style={styles.surface}>{surface}</Text>
                 </View>
             </TouchableOpacity>
 
@@ -111,57 +124,66 @@ export default function TournamentSection({
 const styles = StyleSheet.create({
     container: {
         marginBottom: 24,
-        backgroundColor: 'transparent', // Let matches have their own cards or wrap them? 
-        // Guide shows "Matches" organized in cards. 
-        // If TournamentSection wraps matches, maybe the section header is just a title?
-        // But the current implementation is an accordion.
-        // Let's keep the accordion style but make it look cleaner.
         marginHorizontal: 16,
+        backgroundColor: 'transparent',
     },
     header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingVertical: 12,
-        paddingHorizontal: 4,
-        // backgroundColor: COLORS.surface, // Remove background from header to make it float? Or keep it?
-        // Let's make the header stand out less as a box, more as a title.
+        paddingVertical: 10,
+        paddingHorizontal: 0,
         marginBottom: 8,
     },
-    headerLeft: {
+    headerTopRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        flex: 1,
+        gap: 10,
+        minWidth: 0,
     },
     chevron: {
         fontSize: 12,
         color: COLORS.textSecondary,
-        marginRight: 8,
         width: 16,
-    },
-    tournamentInfo: {
-        flex: 1,
-    },
-    tournamentNameRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        marginBottom: 2,
+        textAlign: 'center',
     },
     tournamentName: {
+        flex: 1,
+        minWidth: 0,
         fontSize: 16,
         fontWeight: '700',
         color: COLORS.textPrimary,
-        flex: 1,
+    },
+    headerRightGroup: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        flexShrink: 0,
     },
     tournamentLink: {
-        paddingVertical: 2,
-        paddingHorizontal: 6,
+        height: 32,
+        paddingHorizontal: 12,
+        backgroundColor: COLORS.primary + '18',
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: COLORS.primary + '50',
+        justifyContent: 'center',
     },
+    tournamentLinkContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    trophyIcon: {},
     tournamentLinkText: {
         fontSize: 12,
         color: COLORS.primary,
-        fontWeight: '600',
+        fontWeight: '700',
+    },
+    headerBottomRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 4,
+    },
+    chevronSpacer: {
+        width: 26,
     },
     surface: {
         fontSize: 12,
@@ -169,18 +191,14 @@ const styles = StyleSheet.create({
         textTransform: 'uppercase',
         letterSpacing: 1,
     },
-    headerRight: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-    },
     badge: {
-        backgroundColor: COLORS.surface, // Background for badge
+        backgroundColor: COLORS.surface,
         paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 12,
-        minWidth: 32,
+        borderRadius: 16,
+        minWidth: 36,
+        height: 32,
         alignItems: 'center',
+        justifyContent: 'center',
         borderWidth: 1,
         borderColor: COLORS.border,
     },

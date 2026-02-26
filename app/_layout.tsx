@@ -71,9 +71,16 @@ export default function RootLayout() {
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="(auth)" options={{ headerShown: false }} />
             <Stack.Screen name="match/[id]" />
-            <Stack.Screen name="player/[key]" />
-            <Stack.Screen name="tournament/[key]" />
-            <Stack.Screen name="settings" />
+            <Stack.Screen name="player/[key]" options={{ headerShown: false }} />
+            <Stack.Screen name="tournament/[key]" options={{ headerShown: false }} />
+            <Stack.Screen name="search" options={{ title: 'Buscar' }} />
+            <Stack.Screen
+              name="settings"
+              options={{
+                title: 'Configuración',
+                headerShown: false,
+              }}
+            />
             <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
           </Stack>
           <StatusBar style="light" />

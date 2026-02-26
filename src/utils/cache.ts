@@ -92,6 +92,7 @@ export const playerCache = new Cache(10); // 10 minutes - player data changes ra
 export const h2hCache = new Cache(30); // 30 minutes - H2H is static
 export const matchCache = new Cache(5); // 5 minutes - match data changes frequently
 export const tournamentCache = new Cache(60); // 1 hour - tournament data is static
+export const upcomingCache = new Cache(10); // 10 minutes - upcoming fixtures
 
 /**
  * Fetch data with caching support
@@ -108,12 +109,10 @@ export async function fetchWithCache<T>(
     // Try to get from cache first
     const cached = cache.get<T>(key);
     if (cached !== null) {
-        console.log(`[Cache HIT] ${key}`);
         return cached;
     }
 
     // Fetch fresh data
-    console.log(`[Cache MISS] ${key}`);
     const data = await fetcher();
 
     // Store in cache
@@ -130,7 +129,7 @@ export function clearAllCaches(): void {
     h2hCache.clear();
     matchCache.clear();
     tournamentCache.clear();
-    console.log('[Cache] All caches cleared');
+    upcomingCache.clear();
 }
 
 /**
@@ -142,6 +141,7 @@ export function getAllCacheStats() {
         h2h: h2hCache.getStats(),
         match: matchCache.getStats(),
         tournament: tournamentCache.getStats(),
+        upcoming: upcomingCache.getStats(),
     };
 }
 

@@ -1,12 +1,21 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import React from 'react';
-import { FavoritesRefreshProvider } from '../../src/contexts/FavoritesRefreshContext';
+import React, { useEffect } from 'react';
+import { FavoritesProvider } from '../../src/contexts/FavoritesContext';
+import { FavoritesRefreshProvider, useFavoritesRefresh } from '../../src/contexts/FavoritesRefreshContext';
+import { useFavorites } from '../../src/hooks/useFavorites';
 import { COLORS } from '../../src/utils/constants';
 
-export default function TabLayout() {
+function TabsWithBadge() {
+  const { favorites, refresh } = useFavorites();
+  const { refreshTrigger } = useFavoritesRefresh();
+  const favoritesCount = favorites?.length ?? 0;
+
+  useEffect(() => {
+    refresh();
+  }, [refreshTrigger, refresh]);
+
   return (
-    <FavoritesRefreshProvider>
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -43,9 +52,9 @@ export default function TabLayout() {
       <Tabs.Screen
         name="explore"
         options={{
-          title: 'Explorar',
+          title: 'Torneos',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="compass" size={size} color={color} />
+            <Ionicons name="trophy" size={size} color={color} />
           ),
         }}
       />
@@ -56,6 +65,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="star" size={size} color={color} />
           ),
+          tabBarBadge: favoritesCount > 0 ? favoritesCount : undefined,
         }}
       />
       <Tabs.Screen
@@ -68,6 +78,15 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
+  );
+}
+
+export default function TabLayout() {
+  return (
+    <FavoritesRefreshProvider>
+      <FavoritesProvider>
+        <TabsWithBadge />
+      </FavoritesProvider>
     </FavoritesRefreshProvider>
   );
 }

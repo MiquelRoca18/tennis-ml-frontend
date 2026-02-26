@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   RefreshControl,
   ScrollView,
@@ -7,6 +7,7 @@ import {
   Text,
   View
 } from 'react-native';
+import AppHeader from '../../components/common/AppHeader';
 import ErrorMessage from '../../components/common/ErrorMessage';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import DateSelector from '../../components/match/DateSelector';
@@ -16,6 +17,8 @@ import TournamentSection from '../../components/match/TournamentSection';
 import { useFavoritesRefresh } from '../../src/contexts/FavoritesRefreshContext';
 import { useSmartAutoRefresh } from '../../src/hooks/useAutoRefresh';
 import { fetchMatches } from '../../src/services/api/matchService';
+import { prefetchMatchFull } from '../../src/services/api/matchDetailService';
+import { getCachedMatches, setCachedMatches } from '../../src/services/api/matchesCache';
 import { Match } from '../../src/types/api';
 import { COLORS } from '../../src/utils/constants';
 import { formatDateLong, getDateRange, getTodayDate, isMatchStarted } from '../../src/utils/dateUtils';
@@ -35,17 +38,63 @@ export default function MatchFeedScreen() {
   // Generate date range for selector (7 days before and after today)
   const dateRange = useMemo(() => getDateRange(7, 7), []);
 
-  // Load matches
-  const loadMatches = useCallback(async (date: string) => {
+  const selectedDateRef = useRef(selectedDate);
+  selectedDateRef.current = selectedDate;
+
+  const loadMatches = useCallback(async (date: string, forceNetwork = false) => {
+    const cached = !forceNetwork ? getCachedMatches(date) : null;
+    if (cached) {
+      if (__DEV__) console.log(`[Feed] ${date} - CACHE HIT, showing immediately`);
+      setError(null);
+      setMatches(cached.partidos ?? []);
+      setMatchesSummary(cached.resumen ?? null);
+      if (cached.betting_config != null) setBettingConfig(cached.betting_config);
+      setLoading(false);
+      setRefreshing(false);
+      fetchMatches(date)
+        .then((response) => {
+          setCachedMatches(date, response);
+          if (selectedDateRef.current === date) {
+            setMatches(response.partidos ?? []);
+            setMatchesSummary(response.resumen ?? null);
+            if (response.betting_config != null) setBettingConfig(response.betting_config);
+          }
+        })
+        .catch(() => {});
+      return;
+    }
+    // Primera carga sin caché: pedir sin enriquecimiento live (respuesta en ~2-5s en vez de ~15s)
+    if (__DEV__) {
+      console.log(`[Feed] ${date} - no cache, first load (live=false)`);
+      console.time(`[Feed] ${date}`);
+    }
     try {
       setError(null);
-      const response = await fetchMatches(date);
-      setMatches(response.partidos);
-      setMatchesSummary(response.resumen);
-      if (response.betting_config) setBettingConfig(response.betting_config);
+      const response = await fetchMatches(date, { live: false });
+      if (__DEV__) {
+        console.timeEnd(`[Feed] ${date}`);
+        console.log(`[Feed] ${date} - done, ${response.partidos?.length ?? 0} partidos`);
+      }
+      setMatches(response.partidos ?? []);
+      setMatchesSummary(response.resumen ?? null);
+      if (response.betting_config != null) setBettingConfig(response.betting_config);
+      setCachedMatches(date, response);
+      setLoading(false);
+      setRefreshing(false);
+      // Revalidar en segundo plano con datos en directo para actualizar estados/marcadores
+      fetchMatches(date)
+        .then((full) => {
+          setCachedMatches(date, full);
+          if (selectedDateRef.current === date) {
+            setMatches(full.partidos ?? []);
+            setMatchesSummary(full.resumen ?? null);
+            if (full.betting_config != null) setBettingConfig(full.betting_config);
+          }
+        })
+        .catch(() => {});
     } catch (err: any) {
-      setError(err.message || 'Error al cargar los partidos');
-    } finally {
+      if (__DEV__) console.timeEnd(`[Feed] ${date}`);
+      setError(err?.message || 'Error al cargar los partidos');
       setLoading(false);
       setRefreshing(false);
     }
@@ -59,7 +108,7 @@ export default function MatchFeedScreen() {
   // Pull to refresh
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    loadMatches(selectedDate);
+    loadMatches(selectedDate, true);
   }, [selectedDate, loadMatches]);
 
   // Solo considerar "en vivo" si el partido ha empezado (fecha+hora en el pasado)
@@ -84,11 +133,17 @@ export default function MatchFeedScreen() {
     loadMatches(selectedDate);
   });
 
-  // Refrescar estado de favoritos al volver a esta pestaña (ej. si se quitó un favorito desde la vista Favoritos)
+  // Al volver a la pestaña, recargar partidos (excepto en el primer foco para no duplicar la carga inicial)
+  const isFirstFocus = useRef(true);
   useFocusEffect(
     useCallback(() => {
       incrementRefresh();
-    }, [incrementRefresh])
+      if (isFirstFocus.current) {
+        isFirstFocus.current = false;
+        return;
+      }
+      loadMatches(selectedDate);
+    }, [incrementRefresh, selectedDate, loadMatches])
   );
 
   // Handle date selection
@@ -99,6 +154,7 @@ export default function MatchFeedScreen() {
 
   // Navigate to match detail (pass bankroll so detail can show "según tu bankroll de X€" if needed)
   const handleMatchPress = (match: Match) => {
+    prefetchMatchFull(match.id);
     router.push({
       pathname: '/match/[id]' as any,
       params: {
@@ -109,19 +165,27 @@ export default function MatchFeedScreen() {
     });
   };
 
+  // Un partido cuenta como "En directo" si tiene datos en vivo O si ya empezó y sigue pendiente (sin datos API)
+  const isMatchInLiveTab = useCallback((m: Match) =>
+    m.estado === 'en_juego' || (isMatchStarted(m.fecha_partido, m.hora_inicio) && m.estado === 'pendiente'),
+  []);
+
   // Filter by status (Todos, Finalizados, Por jugar, En directo)
+  // "Por jugar" = solo pendientes que aún no han empezado (los que ya empezaron solo en "En directo")
   const statusFilteredMatches = useMemo(() => {
     if (statusFilter === 'ALL') return matches;
+    if (statusFilter === 'en_juego') return matches.filter(isMatchInLiveTab);
+    if (statusFilter === 'pendiente') return matches.filter(m => m.estado === 'pendiente' && !isMatchInLiveTab(m));
     return matches.filter(m => m.estado === statusFilter);
-  }, [matches, statusFilter]);
+  }, [matches, statusFilter, isMatchInLiveTab]);
 
-  // Status counts for tabs
+  // Status counts: pendiente = solo los que no cuentan como "en directo"
   const statusCounts = useMemo(() => ({
     all: matches.length,
     completado: matches.filter(m => m.estado === 'completado').length,
-    pendiente: matches.filter(m => m.estado === 'pendiente').length,
-    en_juego: matches.filter(m => m.estado === 'en_juego').length,
-  }), [matches]);
+    pendiente: matches.filter(m => m.estado === 'pendiente' && !isMatchInLiveTab(m)).length,
+    en_juego: matches.filter(isMatchInLiveTab).length,
+  }), [matches, isMatchInLiveTab]);
 
   // Group matches by tournament (from status-filtered list)
   const matchesByTournament = useMemo(() => {
@@ -138,9 +202,11 @@ export default function MatchFeedScreen() {
     // Sort matches within each tournament by time
     grouped.forEach((tournamentMatches) => {
       tournamentMatches.sort((a, b) => {
-        // Live matches first
-        if (a.estado === 'en_juego' && b.estado !== 'en_juego') return -1;
-        if (a.estado !== 'en_juego' && b.estado === 'en_juego') return 1;
+        // Partidos "en directo" (con datos o empezados sin datos) primero
+        const aLive = isMatchInLiveTab(a);
+        const bLive = isMatchInLiveTab(b);
+        if (aLive && !bLive) return -1;
+        if (!aLive && bLive) return 1;
 
         // Then by time
         const timeA = a.hora_inicio || '23:59';
@@ -150,7 +216,7 @@ export default function MatchFeedScreen() {
     });
 
     return grouped;
-  }, [statusFilteredMatches]);
+  }, [statusFilteredMatches, isMatchInLiveTab]);
 
   // Render match card
   const renderMatch = (match: Match) => (
@@ -177,15 +243,13 @@ export default function MatchFeedScreen() {
   if (loading && !refreshing) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>🎾 Tennis ML</Text>
-        </View>
+        <AppHeader title="Tenis" showSearch showAccount />
         <DateSelector
           dates={dateRange}
           selectedDate={selectedDate}
           onDateSelect={handleDateSelect}
         />
-        <LoadingSpinner />
+        <LoadingSpinner message="Cargando partidos..." />
       </View>
     );
   }
@@ -194,28 +258,32 @@ export default function MatchFeedScreen() {
   if (error && !refreshing) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>🎾 Tennis ML</Text>
-        </View>
+        <AppHeader title="Tenis" showSearch showAccount />
         <DateSelector
           dates={dateRange}
           selectedDate={selectedDate}
           onDateSelect={handleDateSelect}
         />
-        <ErrorMessage message={error} onRetry={() => loadMatches(selectedDate)} />
+        <ErrorMessage
+          message={error}
+          onRetry={() => {
+            setLoading(true);
+            setError(null);
+            loadMatches(selectedDate);
+          }}
+        />
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>🎾 Tennis ML</Text>
-        <Text style={styles.headerSubtitle}>
-          {formatDateLong(selectedDate)}
-        </Text>
-      </View>
+      <AppHeader
+        title="Tenis"
+        subtitle={formatDateLong(selectedDate)}
+        showSearch
+        showAccount
+      />
 
       {/* Date Selector */}
       <DateSelector
@@ -238,9 +306,9 @@ export default function MatchFeedScreen() {
             {statusFilteredMatches.length} {statusFilteredMatches.length === 1 ? 'partido' : 'partidos'}
             {statusFilter !== 'ALL' && ` (filtrado)`}
           </Text>
-          {statusFilteredMatches.filter(m => m.estado === 'en_juego').length > 0 && (
+          {statusFilteredMatches.filter(isMatchInLiveTab).length > 0 && (
             <Text style={styles.liveIndicator}>
-              🔴 {statusFilteredMatches.filter(m => m.estado === 'en_juego').length} en vivo
+              🔴 {statusFilteredMatches.filter(isMatchInLiveTab).length} en vivo
             </Text>
           )}
         </View>
@@ -296,24 +364,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
-  },
-  header: {
-    backgroundColor: COLORS.surface,
-    paddingTop: 60,
-    paddingBottom: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: COLORS.textPrimary,
-    marginBottom: 4,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
   },
   summaryBar: {
     flexDirection: 'row',

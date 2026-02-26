@@ -1,23 +1,60 @@
 /**
  * Match Detail Service - Servicio para el detalle del partido
  * ===========================================================
- * 
+ *
  * Llama al nuevo endpoint v2/matches/{id}/full que devuelve
  * todos los datos del partido en una sola llamada.
+ * Soporta ?live=false para primera carga rápida (sin enriquecimiento con API externa).
  */
 
 import { MatchFullResponse, MatchTimeline, PointByPointData } from '../../types/matchDetail';
 import apiClient from './apiClient';
+import { setCachedMatchDetail } from './matchDetailCache';
+
+export interface FetchMatchFullOptions {
+  /** Si false, el backend no llama a get_livescore (respuesta más rápida). Default true. */
+  live?: boolean;
+}
 
 /**
  * Obtiene todos los datos del partido en una sola llamada.
- * 
+ *
  * @param matchId - ID del partido
+ * @param options - live: false para primera carga rápida (solo BD)
  * @returns Datos completos del partido
  */
-export const fetchMatchFull = async (matchId: number): Promise<MatchFullResponse> => {
-    const response = await apiClient.get<MatchFullResponse>(`/v2/matches/${matchId}/full`);
-    return response.data;
+export const fetchMatchFull = async (
+  matchId: number,
+  options: FetchMatchFullOptions = {}
+): Promise<MatchFullResponse> => {
+  const { live = true } = options;
+  const response = await apiClient.get<MatchFullResponse>(`/v2/matches/${matchId}/full`, {
+    params: { live: live ? 'true' : 'false' },
+  });
+  return response.data;
+};
+
+/**
+ * Prefetch del detalle de un partido (fire-and-forget).
+ * Guarda el resultado en matchDetailCache para que al abrir la pantalla cargue al instante.
+ */
+export const prefetchMatchFull = (matchId: number): void => {
+  if (__DEV__) {
+    const label = `[prefetchMatchFull] match ${matchId}`;
+    console.log(`${label} - start`);
+    console.time(label);
+  }
+  fetchMatchFull(matchId, { live: false })
+    .then((data) => {
+      setCachedMatchDetail(matchId, data);
+      if (__DEV__) {
+        console.timeEnd(`[prefetchMatchFull] match ${matchId}`);
+        console.log(`[prefetchMatchFull] match ${matchId} - cached, detail will open fast if user navigated`);
+      }
+    })
+    .catch(() => {
+      if (__DEV__) console.timeEnd(`[prefetchMatchFull] match ${matchId}`);
+    });
 };
 
 /**

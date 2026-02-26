@@ -12,9 +12,11 @@ interface FavoriteButtonProps {
     isFavorite: boolean;
     onPress: () => void;
     size?: number;
+    /** Cuando true, muestra la estrella con opacidad reducida (evita salto de layout mientras carga) */
+    dimmed?: boolean;
 }
 
-export default function FavoriteButton({ isFavorite, onPress, size = 24 }: FavoriteButtonProps) {
+export default function FavoriteButton({ isFavorite, onPress, size = 24, dimmed = false }: FavoriteButtonProps) {
     const scale = useSharedValue(1);
 
     const handlePress = () => {
@@ -31,8 +33,13 @@ export default function FavoriteButton({ isFavorite, onPress, size = 24 }: Favor
     }));
 
     return (
-        <TouchableOpacity onPress={handlePress} activeOpacity={0.7} style={styles.container}>
-            <Animated.Text style={[styles.icon, { fontSize: size }, animatedStyle]}>
+        <TouchableOpacity
+            onPress={handlePress}
+            activeOpacity={0.7}
+            style={styles.container}
+            disabled={dimmed}
+        >
+            <Animated.Text style={[styles.icon, { fontSize: size, opacity: dimmed ? 0.45 : 1 }, animatedStyle]}>
                 {isFavorite ? '⭐' : '☆'}
             </Animated.Text>
         </TouchableOpacity>

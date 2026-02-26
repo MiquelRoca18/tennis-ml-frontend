@@ -204,13 +204,20 @@ export default function CompletedMatchScore({
         );
     }
 
-    // Card mode: misma fila de celdas para todos los partidos (juegos por set o solo sets)
+    // Card mode: juegos por set + puntos del juego (en vivo) en una sola fila compacta
     if (playerIndex) {
         const isPlayer1 = playerIndex === 1;
+        const rawGameScore = isLive && scoresFromApi?.live?.current_game_score
+            ? String(scoresFromApi.live.current_game_score).trim()
+            : null;
+        // Formato API: "30 - 0" o "30-0" → jugador1 - jugador2; en cada fila mostramos solo el número de ese jugador (como los juegos del set)
+        const parts = rawGameScore ? rawGameScore.split(/\s*-\s*/).map(s => s.trim()).filter(Boolean) : [];
+        const p1Points = parts[0] ?? null;
+        const p2Points = parts[1] ?? parts[0] ?? null; // si solo hay uno (ej. "Deuce"), ambos lo muestran
+        const currentGameScore = isPlayer1 ? p1Points : p2Points;
 
         return (
             <View style={styles.scoreRow}>
-                {/* Solo juegos por set (sin columna "sets ganados") para que todas las cards se vean igual */}
                 <View style={styles.gamesContainer}>
                     {setScores.map((set, idx) => {
                         const g = isPlayer1 ? set.g1 : set.g2;
@@ -244,6 +251,13 @@ export default function CompletedMatchScore({
                         );
                     })}
                 </View>
+                {currentGameScore ? (
+                    <View style={styles.gamePointsBadge}>
+                        <Text style={[styles.gamePointsText, isLive && styles.liveGameText]} numberOfLines={1}>
+                            {currentGameScore}
+                        </Text>
+                    </View>
+                ) : null}
             </View>
         );
     }
@@ -333,7 +347,9 @@ const styles = StyleSheet.create({
     scoreRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
+        gap: 4,
+        flexShrink: 1,
+        minWidth: 0,
     },
     rightInfo: {
         alignItems: 'flex-end',
@@ -366,11 +382,14 @@ const styles = StyleSheet.create({
     },
     gamesContainer: {
         flexDirection: 'row',
-        gap: 4,
+        gap: 2,
+        flexShrink: 1,
+        minWidth: 0,
     },
     gameCell: {
-        minWidth: 20,
+        minWidth: 14,
         alignItems: 'center',
+        flexShrink: 0,
     },
     gameWithSup: {
         flexDirection: 'row',
@@ -378,8 +397,8 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     gameText: {
-        fontSize: 12,
-        fontWeight: '500',
+        fontSize: 11,
+        fontWeight: '600',
         color: COLORS.textMuted,
         fontFamily: 'RobotoMono-Regular',
     },
@@ -392,12 +411,29 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
     tiebreakSuperscript: {
-        fontSize: 7,
+        fontSize: 6,
         fontWeight: '600',
         color: COLORS.textMuted,
         marginLeft: 0,
-        marginTop: -6,
-        lineHeight: 8,
+        marginTop: -3,
+        lineHeight: 7,
+        fontFamily: 'RobotoMono-Regular',
+    },
+    gamePointsBadge: {
+        marginLeft: 6,
+        paddingHorizontal: 5,
+        paddingVertical: 2,
+        borderRadius: 4,
+        backgroundColor: COLORS.surface || 'rgba(255,255,255,0.06)',
+        alignSelf: 'center',
+        minWidth: 30,
+        alignItems: 'center',
+        flexShrink: 0,
+    },
+    gamePointsText: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: COLORS.textMuted,
         fontFamily: 'RobotoMono-Regular',
     },
 });

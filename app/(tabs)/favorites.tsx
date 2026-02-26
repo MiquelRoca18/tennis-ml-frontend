@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   RefreshControl,
   ScrollView,
@@ -13,17 +13,24 @@ import type { Favorite } from '../../src/services/favoritesService';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useFavorites } from '../../src/hooks/useFavorites';
+import { fetchMatches } from '../../src/services/api/matchService';
 import { COLORS } from '../../src/utils/constants';
+import { getTodayDate } from '../../src/utils/dateUtils';
+
+type FavoritesFilter = 'all' | 'live';
 
 export default function FavoritesScreen() {
   const router = useRouter();
   const { user, isConfigured } = useAuth();
   const { favorites, loading, refresh } = useFavorites();
   const [refreshing, setRefreshing] = useState(false);
+  const [filter, setFilter] = useState<FavoritesFilter>('all');
+  const [liveMatchIds, setLiveMatchIds] = useState<Set<number>>(new Set());
 
   const onRefresh = async () => {
     setRefreshing(true);
     await refresh();
+    if (filter === 'live') await fetchLiveIds();
     setRefreshing(false);
   };
 
@@ -33,6 +40,54 @@ export default function FavoritesScreen() {
       refresh();
     }, [refresh])
   );
+
+  const fetchLiveIds = useCallback(async () => {
+    try {
+      const res = await fetchMatches(getTodayDate());
+      setLiveMatchIds(
+        new Set((res.partidos ?? []).filter((m) => m.estado === 'en_juego').map((m) => m.id))
+      );
+    } catch {
+      setLiveMatchIds(new Set());
+    }
+  }, []);
+
+  // Cuando el filtro es "En directo", cargar partidos de hoy y refrescar cada 60 s
+  useEffect(() => {
+    if (filter !== 'live') return;
+    let cancelled = false;
+    fetchLiveIds();
+    const interval = setInterval(() => {
+      if (cancelled) return;
+      fetchLiveIds();
+    }, 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [filter, fetchLiveIds]);
+
+  // Hooks siempre en el mismo orden (antes de cualquier return)
+  const filteredFavorites = useMemo(() => {
+    if (filter === 'all') return favorites;
+    return favorites.filter((fav) => liveMatchIds.has(fav.matchId));
+  }, [favorites, filter, liveMatchIds]);
+
+  const favoritesByTournament = useMemo(() => {
+    const grouped = new Map<string, Favorite[]>();
+    filteredFavorites.forEach((fav) => {
+      const key = fav.tournament?.trim() || 'Sin Torneo';
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key)!.push(fav);
+    });
+    grouped.forEach((list) => {
+      list.sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime());
+    });
+    return new Map([...grouped.entries()].sort(([a], [b]) => a.localeCompare(b)));
+  }, [filteredFavorites]);
+
+  const hasFavorites = favorites.length > 0;
+  const showLoginPrompt = !user && !hasFavorites && isConfigured;
 
   if (loading && !refreshing) {
     return (
@@ -44,23 +99,6 @@ export default function FavoritesScreen() {
       </View>
     );
   }
-
-  const hasFavorites = favorites.length > 0;
-  const showLoginPrompt = !user && !hasFavorites && isConfigured;
-
-  // Agrupar favoritos por torneo, ordenados
-  const favoritesByTournament = useMemo(() => {
-    const grouped = new Map<string, Favorite[]>();
-    favorites.forEach((fav) => {
-      const key = fav.tournament?.trim() || 'Sin Torneo';
-      if (!grouped.has(key)) grouped.set(key, []);
-      grouped.get(key)!.push(fav);
-    });
-    grouped.forEach((list) => {
-      list.sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime());
-    });
-    return new Map([...grouped.entries()].sort(([a], [b]) => a.localeCompare(b)));
-  }, [favorites]);
 
   return (
     <View style={styles.container}>
@@ -103,6 +141,27 @@ export default function FavoritesScreen() {
 
       {hasFavorites && (
         <>
+          {/* Filtros Todos / En directo */}
+          <View style={styles.filterRow}>
+            <TouchableOpacity
+              style={[styles.filterPill, filter === 'all' && styles.filterPillActive]}
+              onPress={() => setFilter('all')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.filterPillText, filter === 'all' && styles.filterPillTextActive]}>
+                Todos los partidos
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.filterPill, filter === 'live' && styles.filterPillActive]}
+              onPress={() => setFilter('live')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.filterPillText, filter === 'live' && styles.filterPillTextActive]}>
+                En directo
+              </Text>
+            </TouchableOpacity>
+          </View>
           {!user && isConfigured && (
             <TouchableOpacity
               style={styles.syncBanner}
@@ -124,6 +183,12 @@ export default function FavoritesScreen() {
               />
             }
           >
+            {filter === 'live' && filteredFavorites.length === 0 && (
+              <View style={styles.emptyFilterState}>
+                <Text style={styles.emptyFilterText}>No hay favoritos en directo ahora</Text>
+                <Text style={styles.emptyFilterSubtext}>Pulsa "Todos los partidos" para ver todos</Text>
+              </View>
+            )}
             {Array.from(favoritesByTournament.entries()).map(([tournamentName, tournamentFavorites]) => (
               <FavoriteTournamentSection
                 key={tournamentName}
@@ -160,6 +225,49 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   headerSubtitle: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+  },
+  filterRow: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: COLORS.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  filterPill: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: COLORS.background,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  filterPillActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  filterPillText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+  },
+  filterPillTextActive: {
+    color: '#FFF',
+  },
+  emptyFilterState: {
+    padding: 24,
+    alignItems: 'center',
+  },
+  emptyFilterText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    marginBottom: 4,
+  },
+  emptyFilterSubtext: {
     fontSize: 14,
     color: COLORS.textSecondary,
   },

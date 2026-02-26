@@ -37,7 +37,6 @@ function mapSupabaseToFavorite(row: {
 /** Obtener favoritos (Supabase si hay userId, sino AsyncStorage) */
 export async function getFavorites(userId?: string | null): Promise<Favorite[]> {
   if (userId && isSupabaseConfigured) {
-    if (__DEV__) console.log('[Favorites] getFavorites desde Supabase, userId:', userId.slice(0, 8) + '...');
     const { data, error } = await supabase
       .from('favorites')
       .select('match_id, player1_name, player2_name, tournament, added_at')
@@ -48,14 +47,12 @@ export async function getFavorites(userId?: string | null): Promise<Favorite[]> 
       console.error('[Favorites] Error Supabase getFavorites:', error.message, 'code:', error.code);
       return [];
     }
-    if (__DEV__) console.log('[Favorites] Supabase devolvió', (data ?? []).length, 'favoritos');
     return (data ?? []).map(mapSupabaseToFavorite);
   }
 
   try {
     const json = await AsyncStorage.getItem(FAVORITES_KEY);
     const favs = json ? JSON.parse(json) : [];
-    if (__DEV__) console.log('[Favorites] AsyncStorage devolvió', favs.length, 'favoritos');
     return favs;
   } catch (error) {
     console.error('[Favorites] Error AsyncStorage getFavorites:', error);
@@ -86,13 +83,8 @@ export async function addFavorite(
     });
 
     if (error) {
-      if (error.code === '23505') {
-        if (__DEV__) console.log('[Favorites] addFavorite: ya existe (23505)');
-        return;
-      }
+      if (error.code === '23505') return;
       console.error('[Favorites] Error Supabase addFavorite:', error.message, 'code:', error.code);
-    } else if (__DEV__) {
-      console.log('[Favorites] addFavorite OK, matchId:', favorite.matchId);
     }
     return;
   }
@@ -119,8 +111,6 @@ export async function removeFavorite(matchId: number, userId?: string | null): P
 
     if (error) {
       console.error('[Favorites] Error Supabase removeFavorite:', error.message, 'code:', error.code);
-    } else if (__DEV__) {
-      console.log('[Favorites] removeFavorite OK, matchId:', matchId);
     }
     return;
   }
@@ -173,7 +163,5 @@ export async function migrateLocalFavoritesToSupabase(userId: string): Promise<v
     await AsyncStorage.removeItem(FAVORITES_KEY);
   } catch (error) {
     console.error('[Favorites] Error migrateLocalFavoritesToSupabase:', error);
-  } finally {
-    if (__DEV__) console.log('[Favorites] Migración completada');
   }
 }

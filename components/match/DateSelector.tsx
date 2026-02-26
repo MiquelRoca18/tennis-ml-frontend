@@ -61,7 +61,7 @@ export default function DateSelector({ dates, selectedDate, onDateSelect }: Date
                                     isTodayDate && !isSelected && styles.dayNameToday,
                                 ]}
                             >
-                                {dayName}
+                                {isTodayDate ? 'HOY' : dayName}
                             </Text>
                             <Text
                                 style={[
@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
         elevation: 4,
     },
     dateItemToday: {
-        borderColor: COLORS.primary,
+        borderColor: COLORS.liveRed,
         borderWidth: 1,
     },
     dayName: {
@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
     dayNameToday: {
-        color: COLORS.primary,
+        color: COLORS.liveRed,
     },
     dayNumber: {
         fontSize: 18,
@@ -142,7 +142,7 @@ const styles = StyleSheet.create({
         color: '#0A1929', // Dark color for contrast
     },
     dayNumberToday: {
-        color: COLORS.primary,
+        color: COLORS.liveRed,
     },
     todayDot: {
         position: 'absolute',
@@ -150,7 +150,7 @@ const styles = StyleSheet.create({
         width: 4,
         height: 4,
         borderRadius: 2,
-        backgroundColor: COLORS.primary,
+        backgroundColor: COLORS.liveRed,
     },
     todayDotSelected: {
         backgroundColor: '#0A1929',

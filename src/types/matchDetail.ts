@@ -23,6 +23,8 @@ export interface PlayerInfo {
     country?: string | null;
     ranking?: number | null;
     logo_url?: string | null;
+    /** ID del jugador para enlace al perfil */
+    player_key?: string | number | null;
 }
 
 // ============================================================
@@ -219,6 +221,8 @@ export interface MatchPrediction {
     probability_player2: number;
     value_bet?: 1 | 2 | null;
     recommendation?: string | null;
+    /** Jugador recomendado para apostar: 1 o 2. Null si no hay recomendación (NO APOSTAR). */
+    recommended_bet_side?: 1 | 2 | null;
     /** Stake sugerido en € (Kelly) para jugador 1 */
     kelly_stake_jugador1?: number | null;
     /** Stake sugerido en € (Kelly) para jugador 2 */

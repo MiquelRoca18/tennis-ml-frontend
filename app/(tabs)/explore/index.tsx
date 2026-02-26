@@ -26,7 +26,7 @@ export default function ExploreScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>Explorar datos del circuito</Text>
+      <Text style={styles.header}>Torneos y ranking</Text>
       {MENU_ITEMS.map((item) => (
         <TouchableOpacity
           key={item.key}

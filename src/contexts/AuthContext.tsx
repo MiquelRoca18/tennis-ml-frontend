@@ -29,29 +29,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
-      if (__DEV__) console.log('[Auth] Supabase no configurado, auth deshabilitado');
       setLoading(false);
       return;
     }
 
-    if (__DEV__) console.log('[Auth] Iniciando sesión, obteniendo session...');
     supabase.auth.getSession().then(async ({ data: { session }, error }) => {
-      if (__DEV__) {
-        if (error) console.error('[Auth] getSession error:', error.message);
-        else console.log('[Auth] Session:', session ? `user ${session.user?.email}` : 'ninguna');
-      }
+      if (error) console.error('[Auth] getSession:', error.message);
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
       if (session?.user?.id && hasMigratedRef.current !== session.user.id) {
         hasMigratedRef.current = session.user.id;
-        if (__DEV__) console.log('[Auth] Migrando favoritos locales a Supabase...');
         await migrateLocalFavoritesToSupabase(session.user.id);
       }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (__DEV__) console.log('[Auth] onAuthStateChange:', event, session?.user?.email ?? 'signed out');
       setSession(session);
       setUser(session?.user ?? null);
 

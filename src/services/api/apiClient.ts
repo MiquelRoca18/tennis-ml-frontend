@@ -4,7 +4,7 @@ import { API_BASE_URL } from '../../utils/constants';
 // Create axios instance with default config
 const apiClient: AxiosInstance = axios.create({
     baseURL: API_BASE_URL,
-    timeout: 30000, // 30 segundos para permitir cold starts
+    timeout: 45000, // 45s (cold start + API externa en stats/detail)
     headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
@@ -14,10 +14,6 @@ const apiClient: AxiosInstance = axios.create({
 // Request interceptor
 apiClient.interceptors.request.use(
     (config) => {
-        // Log requests in development
-        if (__DEV__) {
-            console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url}`);
-        }
         return config;
     },
     (error) => {
@@ -28,16 +24,13 @@ apiClient.interceptors.request.use(
 // Response interceptor
 apiClient.interceptors.response.use(
     (response) => {
-        // Log responses in development
-        if (__DEV__) {
-            console.log(`[API Response] ${response.config.url}`, response.status);
-        }
         return response;
     },
     (error: AxiosError) => {
-        // Handle errors globally
-        if (__DEV__) {
-            console.error('[API Error]', error.message);
+        const url = typeof error.config?.url === 'string' ? error.config.url : '';
+        const isPlayerEndpoint = /players\/\d+/.test(url);
+        if (__DEV__ && !isPlayerEndpoint) {
+            console.warn('[API]', error.message);
         }
 
         // Timeout error

@@ -1,42 +1,53 @@
 import { useCallback, useEffect, useState } from 'react';
-import {
-  Favorite,
-  getFavorites,
-  isFavorite,
-  toggleFavorite,
-} from '../services/favoritesService';
+import type { Favorite } from '../services/favoritesService';
+import { getFavorites, isFavorite, toggleFavorite } from '../services/favoritesService';
 import { useAuth } from '../contexts/AuthContext';
+import { useFavoritesContext } from '../contexts/FavoritesContext';
 import { useFavoritesRefresh } from '../contexts/FavoritesRefreshContext';
 
 /**
- * Hook para gestionar la lista de favoritos
- * Usa Supabase si hay usuario, AsyncStorage si no
+ * Hook para gestionar la lista de favoritos.
+ * Si existe FavoritesProvider, usa el contexto (una sola carga). Si no, carga con getFavorites.
  */
 export function useFavorites() {
+  const ctx = useFavoritesContext();
   const { user } = useAuth();
-  const [favorites, setFavorites] = useState<Favorite[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [localFavorites, setLocalFavorites] = useState<Favorite[]>([]);
+  const [localLoading, setLocalLoading] = useState(true);
 
   const loadFavorites = useCallback(async () => {
-    setLoading(true);
+    setLocalLoading(true);
     const favs = await getFavorites(user?.id);
-    setFavorites(favs);
-    setLoading(false);
+    setLocalFavorites(favs);
+    setLocalLoading(false);
   }, [user?.id]);
 
   useEffect(() => {
+    if (ctx) return;
     loadFavorites();
-  }, [loadFavorites]);
+  }, [ctx, loadFavorites]);
 
-  const refresh = useCallback(() => loadFavorites(), [loadFavorites]);
+  const refresh = useCallback(async () => {
+    if (ctx) {
+      await ctx.refresh();
+      return;
+    }
+    await loadFavorites();
+  }, [ctx, loadFavorites]);
 
-  return { favorites, loading, refresh };
+  if (ctx) {
+    return { favorites: ctx.favorites, loading: ctx.loading, refresh };
+  }
+  return { favorites: localFavorites, loading: localLoading, refresh };
 }
 
 /**
- * Hook para comprobar si un partido es favorito y hacer toggle
+ * Hook para comprobar si un partido es favorito y hacer toggle.
+ * Con FavoritesProvider: usa el Set del contexto (0 llamadas extra por card).
+ * Sin contexto: una llamada isFavorite (getFavorites) por card.
  */
 export function useIsFavorite(matchId: number | null) {
+  const ctx = useFavoritesContext();
   const { user } = useAuth();
   const { refreshTrigger } = useFavoritesRefresh();
   const [favorited, setFavorited] = useState(false);
@@ -55,25 +66,42 @@ export function useIsFavorite(matchId: number | null) {
   }, [matchId, user?.id]);
 
   useEffect(() => {
-    checkFavorite();
-  }, [checkFavorite, refreshTrigger]);
+    if (!ctx) {
+      checkFavorite();
+    }
+  }, [ctx, matchId, refreshTrigger, checkFavorite]);
 
-  const toggle = async (matchData: {
-    player1Name: string;
-    player2Name: string;
-    tournament: string;
-    eventKey?: string;
-  }): Promise<boolean> => {
-    if (!matchId) return false;
-    const newStatus = await toggleFavorite(
-      matchId,
-      matchData,
-      user?.id,
-      matchData.eventKey
-    );
-    setFavorited(newStatus);
-    return newStatus;
-  };
+  const toggle = useCallback(
+    async (matchData: {
+      player1Name: string;
+      player2Name: string;
+      tournament: string;
+      eventKey?: string;
+    }): Promise<boolean> => {
+      if (!matchId) return false;
+      if (ctx) {
+        const newStatus = await ctx.toggle(matchId, matchData);
+        return newStatus;
+      }
+      const newStatus = await toggleFavorite(
+        matchId,
+        matchData,
+        user?.id,
+        matchData.eventKey
+      );
+      setFavorited(newStatus);
+      return newStatus;
+    },
+    [matchId, ctx, user?.id]
+  );
 
+  if (ctx) {
+    return {
+      favorited: matchId != null ? ctx.favoriteMatchIds.has(matchId) : false,
+      loading: ctx.loading,
+      toggle,
+      refresh: ctx.refresh,
+    };
+  }
   return { favorited, loading, toggle, refresh: checkFavorite };
 }

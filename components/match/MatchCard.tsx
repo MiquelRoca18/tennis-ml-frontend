@@ -1,11 +1,12 @@
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import FavoriteButton from '../ui/FavoriteButton';
 import { useIsFavorite } from '../../src/hooks/useFavorites';
+import { fetchPlayerLookup } from '../../src/services/api/playerService';
 import { Match } from '../../src/types/api';
 import { COLORS, EV_THRESHOLD_BET, EV_THRESHOLD_MARGINAL } from '../../src/utils/constants';
-import { formatSeed, getCountryFlag } from '../../src/utils/countryUtils';
+import { formatSeed, getCountryFlagSafe } from '../../src/utils/countryUtils';
 import { isMatchStarted } from '../../src/utils/dateUtils';
 import { formatMatchStatus, formatMatchTime, formatOdds, formatPercentage, formatProbability } from '../../src/utils/formatters';
 import CompletedMatchScore from './CompletedMatchScore';
@@ -24,23 +25,35 @@ export default function MatchCard({ match, onPress, onFavoriteRemoved }: MatchCa
     const { jugador1, jugador2, prediccion, estado, hora_inicio, is_live, resultado, fecha_partido, event_status } = match;
     const { favorited, loading: favLoading, toggle } = useIsFavorite(match.id);
 
-    // Solo considerar "en vivo" si el partido ha empezado (fecha+hora en el pasado)
+    const isCompleted = estado === 'completado';
+    // En vivo con datos de la API: backend dice en_juego/is_live
     const backendSaysLive = estado === 'en_juego' || Boolean(is_live);
     const hasStarted = isMatchStarted(fecha_partido, hora_inicio);
-    const actuallyLive = backendSaysLive && hasStarted;
+    const actuallyLive = backendSaysLive && (hasStarted || is_live === true);
+    // En la card mostramos LIVE si tenemos datos en directo O si ya empezó y no está terminado (sin datos API → en detalle se verá "Solo Resultado Final")
+    const showLiveOnCard = actuallyLive || (hasStarted && !isCompleted);
 
-    // Get match status (para no-live: mostrar estado; para live real: LiveBadge)
     const matchStatus = formatMatchStatus(estado);
-
-    // Determine if we should show prediction (robusto: null, undefined o objeto vacío)
     const hasPrediction = prediccion != null && typeof prediccion === 'object' && prediccion.jugador1_probabilidad != null;
-    const shouldShowPrediction = estado === 'pendiente' && !actuallyLive && hasPrediction;
-    const isCompleted = estado === 'completado';
+    const shouldShowPrediction = estado === 'pendiente' && !showLiveOnCard && hasPrediction;
 
-    // Para en vivo: si hay resultado pero sin scores (API antigua o error), usar fallback para mostrar 0-0
-    const scoresForDisplay = resultado?.scores ?? (actuallyLive ? { sets_result: '0-0', sets: [] } : null);
+    const scoresForDisplay = resultado?.scores ?? null;
+    const currentServer = resultado?.scores?.live?.current_server ?? null;
+    const isPlayer1Serving = showLiveOnCard && actuallyLive && (currentServer === 'First Player' || /first|1/i.test(String(currentServer || '')));
+    const isPlayer2Serving = showLiveOnCard && actuallyLive && (currentServer === 'Second Player' || /second|2/i.test(String(currentServer || '')));
+    // Mostrar score solo cuando hay datos reales. En directo: no mostrar "0-0" ni marcador "0-0" si no hay sets ni puntos en vivo.
+    const currentGameScore = scoresForDisplay?.live?.current_game_score;
+    const isZeroZero = (s: string | null | undefined) =>
+        s != null && String(s).trim().replace(/\s+/g, '-') === '0-0';
     const hasScoreToShow = Boolean(
-        resultado && (resultado.marcador || (scoresForDisplay && (scoresForDisplay.sets?.length || scoresForDisplay.sets_result)))
+        resultado && (
+            (resultado.marcador && (resultado.marcador.trim() !== '0-0' || !showLiveOnCard))
+            || (scoresForDisplay && (
+                (scoresForDisplay.sets?.length ?? 0) > 0
+                || (currentGameScore != null && !isZeroZero(currentGameScore))
+                || (scoresForDisplay.sets_result && String(scoresForDisplay.sets_result).trim() !== '0-0')
+            ))
+        )
     );
 
     const isRetirementOrWalkover = Boolean(
@@ -92,11 +105,27 @@ export default function MatchCard({ match, onPress, onFavoriteRemoved }: MatchCa
         if (!newStatus) onFavoriteRemoved?.();
     };
 
-    const handlePlayerPress = (playerKey: string, event: any) => {
+    const handlePlayerPress = async (playerKey: string | null | undefined, playerName: string, event: any) => {
         event?.stopPropagation?.();
-        const key = String(playerKey);
-        if (key) {
+        const key = playerKey != null ? String(playerKey).trim() : '';
+        const numericKey = key ? parseInt(key, 10) : NaN;
+        if (key && Number.isFinite(numericKey)) {
             router.push({ pathname: '/player/[key]', params: { key } } as any);
+            return;
+        }
+        if (!playerName || !playerName.trim()) {
+            Alert.alert('Perfil no disponible', 'No se puede abrir el perfil de este jugador.');
+            return;
+        }
+        try {
+            const resolvedKey = await fetchPlayerLookup(playerName.trim());
+            if (resolvedKey != null) {
+                router.push({ pathname: '/player/[key]', params: { key: String(resolvedKey) } } as any);
+            } else {
+                Alert.alert('Perfil no encontrado', 'No se encontró el perfil de este jugador.');
+            }
+        } catch {
+            Alert.alert('Error', 'No se pudo cargar el perfil. Intenta de nuevo.');
         }
     };
 
@@ -111,7 +140,7 @@ export default function MatchCard({ match, onPress, onFavoriteRemoved }: MatchCa
                     {/* Status Bar */}
                     <View style={styles.statusBar}>
                         <View style={styles.statusLeft}>
-                            {actuallyLive ? (
+                            {showLiveOnCard ? (
                                 <LiveBadge />
                             ) : (
                                 <>
@@ -128,15 +157,13 @@ export default function MatchCard({ match, onPress, onFavoriteRemoved }: MatchCa
                         </View>
                         <View style={styles.statusRight}>
                             <Text style={styles.time}>{formatMatchTime(fecha_partido, hora_inicio)}</Text>
-                            {!favLoading && (
-                                <View style={styles.favButton} pointerEvents="box-none">
-                                    <FavoriteButton
-                                        isFavorite={favorited}
-                                        onPress={handleFavoritePress}
-                                        size={20}
-                                    />
-                                </View>
-                            )}
+                            <View style={styles.favButton} pointerEvents={favLoading ? 'none' : 'box-none'}>
+                                <FavoriteButton
+                                    isFavorite={favorited}
+                                    onPress={handleFavoritePress}
+                                    size={20}
+                                />
+                            </View>
                         </View>
                     </View>
 
@@ -144,16 +171,16 @@ export default function MatchCard({ match, onPress, onFavoriteRemoved }: MatchCa
                     <>
                         {/* Player 1 Row */}
                         <View style={styles.playerRow}>
-                            <PlayerLogo logoUrl={jugador1.logo} size={40} style={styles.playerLogo} />
+                            <PlayerLogo logoUrl={jugador1.logo} size={36} style={styles.playerLogo} />
                             <View style={styles.playerInfo}>
                                 <TouchableOpacity
-                                    onPress={(e) => handlePlayerPress(jugador1.key, e)}
+                                    onPress={(e) => handlePlayerPress(jugador1.key, jugador1.nombre, e)}
                                     activeOpacity={0.7}
                                     style={styles.playerNameRow}
                                 >
-                                    {jugador1.pais && (
-                                        <Text style={styles.flag}>{getCountryFlag(jugador1.pais)}</Text>
-                                    )}
+                                    {getCountryFlagSafe(jugador1.pais) ? (
+                                        <Text style={styles.flag}>{getCountryFlagSafe(jugador1.pais)}</Text>
+                                    ) : null}
                                     {jugador1.seed && (
                                         <Text style={styles.seed}>{formatSeed(jugador1.seed)}</Text>
                                     )}
@@ -163,21 +190,22 @@ export default function MatchCard({ match, onPress, onFavoriteRemoved }: MatchCa
                                     ]} numberOfLines={1}>
                                         {jugador1.nombre}
                                     </Text>
+                                    {isPlayer1Serving ? <Text style={styles.serverIcon}>🎾</Text> : null}
                                 </TouchableOpacity>
                                 {jugador1.ranking && (
                                     <Text style={styles.ranking}>#{jugador1.ranking}</Text>
                                 )}
                             </View>
                             <View style={styles.rightInfo}>
-                                {(isCompleted || actuallyLive) && hasScoreToShow ? (
+                                {(isCompleted || showLiveOnCard) && hasScoreToShow ? (
                                     <CompletedMatchScore
-                                        marcador={resultado!.marcador ?? ''}
+                                        marcador={resultado?.marcador ?? ''}
                                         scores={scoresForDisplay ?? undefined}
                                         player1Name={jugador1.nombre}
                                         player2Name={jugador2.nombre}
-                                        isWinner1={resultado!.ganador === jugador1.nombre}
+                                        isWinner1={resultado?.ganador === jugador1.nombre}
                                         playerIndex={1}
-                                        isLive={actuallyLive}
+                                        isLive={showLiveOnCard}
                                     />
                                 ) : shouldShowPrediction && prediccion ? (
                                     <Text style={styles.probability}>{formatProbability(prediccion.jugador1_probabilidad)}</Text>
@@ -192,16 +220,16 @@ export default function MatchCard({ match, onPress, onFavoriteRemoved }: MatchCa
 
                         {/* Player 2 Row */}
                         <View style={styles.playerRow}>
-                            <PlayerLogo logoUrl={jugador2.logo} size={40} style={styles.playerLogo} />
+                            <PlayerLogo logoUrl={jugador2.logo} size={36} style={styles.playerLogo} />
                             <View style={styles.playerInfo}>
                                 <TouchableOpacity
-                                    onPress={(e) => handlePlayerPress(jugador2.key, e)}
+                                    onPress={(e) => handlePlayerPress(jugador2.key, jugador2.nombre, e)}
                                     activeOpacity={0.7}
                                     style={styles.playerNameRow}
                                 >
-                                    {jugador2.pais && (
-                                        <Text style={styles.flag}>{getCountryFlag(jugador2.pais)}</Text>
-                                    )}
+                                    {getCountryFlagSafe(jugador2.pais) ? (
+                                        <Text style={styles.flag}>{getCountryFlagSafe(jugador2.pais)}</Text>
+                                    ) : null}
                                     {jugador2.seed && (
                                         <Text style={styles.seed}>{formatSeed(jugador2.seed)}</Text>
                                     )}
@@ -211,21 +239,22 @@ export default function MatchCard({ match, onPress, onFavoriteRemoved }: MatchCa
                                     ]} numberOfLines={1}>
                                         {jugador2.nombre}
                                     </Text>
+                                    {isPlayer2Serving ? <Text style={styles.serverIcon}>🎾</Text> : null}
                                 </TouchableOpacity>
                                 {jugador2.ranking && (
                                     <Text style={styles.ranking}>#{jugador2.ranking}</Text>
                                 )}
                             </View>
                             <View style={styles.rightInfo}>
-                                {(isCompleted || actuallyLive) && hasScoreToShow ? (
+                                {(isCompleted || showLiveOnCard) && hasScoreToShow ? (
                                     <CompletedMatchScore
-                                        marcador={resultado!.marcador ?? ''}
+                                        marcador={resultado?.marcador ?? ''}
                                         scores={scoresForDisplay ?? undefined}
                                         player1Name={jugador1.nombre}
                                         player2Name={jugador2.nombre}
-                                        isWinner1={resultado!.ganador === jugador2.nombre}
+                                        isWinner1={resultado?.ganador === jugador2.nombre}
                                         playerIndex={2}
-                                        isLive={actuallyLive}
+                                        isLive={showLiveOnCard}
                                     />
                                 ) : shouldShowPrediction && prediccion ? (
                                     <Text style={styles.probability}>{formatProbability(prediccion.jugador2_probabilidad)}</Text>
@@ -335,32 +364,37 @@ const styles = StyleSheet.create({
     },
     favButton: {
         padding: 4,
+        minWidth: 28,
+        alignItems: 'flex-end',
     },
     playerRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 6,
+        paddingVertical: 5,
     },
     playerInfo: {
         flexDirection: 'row',
         alignItems: 'center',
         flex: 1,
-        marginLeft: 12,
+        marginLeft: 10,
+        flexShrink: 1,
+        minWidth: 0,
     },
     playerName: {
-        fontSize: 15,
+        fontSize: 14,
         fontWeight: '600',
         color: COLORS.textPrimary,
-        marginRight: 6,
+        marginRight: 4,
     },
     ranking: {
-        fontSize: 11,
+        fontSize: 10,
         color: COLORS.textSecondary,
         fontWeight: '500',
     },
     rightInfo: {
-        minWidth: 60,
+        minWidth: 80,
         alignItems: 'flex-end',
+        flexShrink: 0,
     },
     probability: {
         fontSize: 16,
@@ -473,13 +507,17 @@ const styles = StyleSheet.create({
     playerNameRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
+        gap: 4,
+    },
+    serverIcon: {
+        fontSize: 12,
+        marginLeft: 2,
     },
     flag: {
-        fontSize: 16,
+        fontSize: 14,
     },
     seed: {
-        fontSize: 11,
+        fontSize: 10,
         fontWeight: '700',
         color: COLORS.textSecondary,
     },

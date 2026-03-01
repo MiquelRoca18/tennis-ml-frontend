@@ -22,6 +22,7 @@ interface PredictionTabV2Props {
 }
 
 export default function PredictionTabV2({ data, scrollable = true, onBetPlaced }: PredictionTabV2Props) {
+    const [showRegisterBetModal, setShowRegisterBetModal] = useState(false);
     const { prediction, player1, player2, odds, match: matchInfo } = data;
 
     const p1Short = getShortName(player1.name);
@@ -50,7 +51,6 @@ export default function PredictionTabV2({ data, scrollable = true, onBetPlaced }
     const bankrollUsed = prediction.bankroll_used ?? 0;
     const hasStake = stakeEur > 0;
     const recommendationText = prediction.recommendation ?? (prediction as { recomendacion?: string }).recomendacion ?? '';
-    const [showRegisterBetModal, setShowRegisterBetModal] = useState(false);
 
     const openRegisterBetModal = () => {
         if (!hasStake || stakeEur <= 0 || !matchInfo?.id) return;

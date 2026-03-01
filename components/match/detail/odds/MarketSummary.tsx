@@ -2,6 +2,14 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { COLORS } from '../../../../src/utils/constants';
 
+/** Fila de estadística para MarketSummary; definido en módulo para no recrear en cada render */
+const StatRow = ({ label, value }: { label: string; value: string }) => (
+    <View style={styles.statRow}>
+        <Text style={styles.statLabel}>{label}</Text>
+        <Text style={styles.statValue}>{value}</Text>
+    </View>
+);
+
 interface MarketSummaryProps {
     oddsData: any;
     player1Name: string;
@@ -66,13 +74,6 @@ export default function MarketSummary({ oddsData, player1Name, player2Name }: Ma
         }
         return 'Ahora';
     };
-
-    const StatRow = ({ label, value }: { label: string; value: string }) => (
-        <View style={styles.statRow}>
-            <Text style={styles.statLabel}>{label}</Text>
-            <Text style={styles.statValue}>{value}</Text>
-        </View>
-    );
 
     return (
         <View style={styles.container}>

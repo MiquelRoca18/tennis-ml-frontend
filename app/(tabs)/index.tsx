@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
   RefreshControl,
   ScrollView,
@@ -23,42 +23,193 @@ import { Match } from '../../src/types/api';
 import { COLORS } from '../../src/utils/constants';
 import { formatDateLong, getDateRange, getTodayDate, isMatchStarted } from '../../src/utils/dateUtils';
 
+const feedLayoutStyles = StyleSheet.create({
+  summaryBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: COLORS.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  summaryText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+  },
+  liveIndicator: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FF4444',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+    marginTop: 60,
+  },
+  emptyIcon: {
+    fontSize: 64,
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptyText: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+  },
+});
+
+// --- Componentes extraídos para reducir tamaño de MatchFeedScreen ---
+
+function FeedEmptyState({ statusFilter }: { statusFilter: StatusFilterValue }) {
+  const statusLabel = statusFilter === 'ALL' ? '' : statusFilter === 'completado' ? ' finalizados' : statusFilter === 'pendiente' ? ' por jugar' : ' en directo';
+  return (
+    <View style={feedLayoutStyles.emptyContainer}>
+      <Text style={feedLayoutStyles.emptyIcon}>🎾</Text>
+      <Text style={feedLayoutStyles.emptyTitle}>
+        No hay partidos{statusLabel} para este día
+      </Text>
+      <Text style={feedLayoutStyles.emptyText}>
+        {statusFilter !== 'ALL' ? 'Prueba otro filtro o ' : ''}Selecciona otra fecha para ver más partidos
+      </Text>
+    </View>
+  );
+}
+
+function FeedSummaryBar({
+  count,
+  liveCount,
+  statusFilter,
+}: {
+  count: number;
+  liveCount: number;
+  statusFilter: StatusFilterValue;
+}) {
+  if (count === 0) return null;
+  return (
+    <View style={feedLayoutStyles.summaryBar}>
+      <Text style={feedLayoutStyles.summaryText}>
+        {count} {count === 1 ? 'partido' : 'partidos'}
+        {statusFilter !== 'ALL' && ` (filtrado)`}
+      </Text>
+      {liveCount > 0 && (
+        <Text style={feedLayoutStyles.liveIndicator}>
+          🔴 {liveCount} en vivo
+        </Text>
+      )}
+    </View>
+  );
+}
+
+// --- Reducer y estado del feed ---
+
+type FeedState = {
+  matches: Match[];
+  loading: boolean;
+  refreshing: boolean;
+  error: string | null;
+  matchesSummary: any;
+  bettingConfig: { bankroll: number } | null;
+};
+
+type FeedAction =
+  | { type: 'CACHE_HIT'; payload: { partidos: Match[]; resumen: any; betting_config?: { bankroll: number } | null } }
+  | { type: 'FETCH_SUCCESS'; payload: { partidos: Match[]; resumen: any; betting_config?: { bankroll: number } | null } }
+  | { type: 'FETCH_ERROR'; payload: string }
+  | { type: 'SET_LOADING'; payload: boolean }
+  | { type: 'SET_REFRESHING'; payload: boolean }
+  | { type: 'RETRY'; payload: null };
+
+const initialFeedState: FeedState = {
+  matches: [],
+  loading: true,
+  refreshing: false,
+  error: null,
+  matchesSummary: null,
+  bettingConfig: null,
+};
+
+function feedReducer(state: FeedState, action: FeedAction): FeedState {
+  switch (action.type) {
+    case 'CACHE_HIT':
+    case 'FETCH_SUCCESS':
+      return {
+        ...state,
+        matches: action.payload.partidos ?? [],
+        matchesSummary: action.payload.resumen ?? null,
+        bettingConfig: action.payload.betting_config ?? state.bettingConfig,
+        loading: false,
+        refreshing: false,
+        error: null,
+      };
+    case 'FETCH_ERROR':
+      return {
+        ...state,
+        error: action.payload,
+        loading: false,
+        refreshing: false,
+      };
+    case 'SET_LOADING':
+      return { ...state, loading: action.payload, ...(action.payload ? { error: null } : {}) };
+    case 'SET_REFRESHING':
+      return { ...state, refreshing: action.payload };
+    case 'RETRY':
+      return { ...state, loading: true, error: null };
+    default:
+      return state;
+  }
+}
+
 export default function MatchFeedScreen() {
   const router = useRouter();
   const { incrementRefresh } = useFavoritesRefresh();
-  const [matches, setMatches] = useState<Match[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedDate, setSelectedDate] = useState<string>(getTodayDate());
+  const [feedState, dispatch] = useReducer(feedReducer, initialFeedState);
+  const { matches, loading, refreshing, error, matchesSummary, bettingConfig } = feedState;
+  const [selectedDate, setSelectedDate] = useState<string>(() => getTodayDate());
   const [statusFilter, setStatusFilter] = useState<StatusFilterValue>('ALL');
-  const [matchesSummary, setMatchesSummary] = useState<any>(null);
-  const [bettingConfig, setBettingConfig] = useState<{ bankroll: number } | null>(null);
 
   // Generate date range for selector (7 days before and after today)
   const dateRange = useMemo(() => getDateRange(7, 7), []);
 
-  const selectedDateRef = useRef(selectedDate);
-  selectedDateRef.current = selectedDate;
+  const cancelledRef = useRef(false);
 
-  const loadMatches = useCallback(async (date: string, forceNetwork = false) => {
+  const loadMatches = useCallback(async (date: string, forceNetwork = false, getIsCancelled?: () => boolean) => {
     const cached = !forceNetwork ? getCachedMatches(date) : null;
     if (cached) {
       if (__DEV__) console.log(`[Feed] ${date} - CACHE HIT, showing immediately`);
-      setError(null);
-      setMatches(cached.partidos ?? []);
-      setMatchesSummary(cached.resumen ?? null);
-      if (cached.betting_config != null) setBettingConfig(cached.betting_config);
-      setLoading(false);
-      setRefreshing(false);
+      queueMicrotask(() => {
+        if (getIsCancelled?.()) return;
+        dispatch({
+          type: 'CACHE_HIT',
+          payload: {
+            partidos: cached.partidos ?? [],
+            resumen: cached.resumen ?? null,
+            betting_config: cached.betting_config ?? undefined,
+          },
+        });
+      });
       fetchMatches(date)
         .then((response) => {
+          if (getIsCancelled?.()) return;
           setCachedMatches(date, response);
-          if (selectedDateRef.current === date) {
-            setMatches(response.partidos ?? []);
-            setMatchesSummary(response.resumen ?? null);
-            if (response.betting_config != null) setBettingConfig(response.betting_config);
-          }
+          dispatch({
+            type: 'FETCH_SUCCESS',
+            payload: {
+              partidos: response.partidos ?? [],
+              resumen: response.resumen ?? null,
+              betting_config: response.betting_config ?? undefined,
+            },
+          });
         })
         .catch(() => {});
       return;
@@ -69,45 +220,54 @@ export default function MatchFeedScreen() {
       console.time(`[Feed] ${date}`);
     }
     try {
-      setError(null);
+      dispatch({ type: 'SET_LOADING', payload: true });
       const response = await fetchMatches(date, { live: false });
       if (__DEV__) {
         console.timeEnd(`[Feed] ${date}`);
         console.log(`[Feed] ${date} - done, ${response.partidos?.length ?? 0} partidos`);
       }
-      setMatches(response.partidos ?? []);
-      setMatchesSummary(response.resumen ?? null);
-      if (response.betting_config != null) setBettingConfig(response.betting_config);
+      dispatch({
+        type: 'FETCH_SUCCESS',
+        payload: {
+          partidos: response.partidos ?? [],
+          resumen: response.resumen ?? null,
+          betting_config: response.betting_config ?? undefined,
+        },
+      });
       setCachedMatches(date, response);
-      setLoading(false);
-      setRefreshing(false);
       // Revalidar en segundo plano con datos en directo para actualizar estados/marcadores
       fetchMatches(date)
         .then((full) => {
+          if (getIsCancelled?.()) return;
           setCachedMatches(date, full);
-          if (selectedDateRef.current === date) {
-            setMatches(full.partidos ?? []);
-            setMatchesSummary(full.resumen ?? null);
-            if (full.betting_config != null) setBettingConfig(full.betting_config);
-          }
+          dispatch({
+            type: 'FETCH_SUCCESS',
+            payload: {
+              partidos: full.partidos ?? [],
+              resumen: full.resumen ?? null,
+              betting_config: full.betting_config ?? undefined,
+            },
+          });
         })
         .catch(() => {});
     } catch (err: any) {
       if (__DEV__) console.timeEnd(`[Feed] ${date}`);
-      setError(err?.message || 'Error al cargar los partidos');
-      setLoading(false);
-      setRefreshing(false);
+      dispatch({ type: 'FETCH_ERROR', payload: err?.message || 'Error al cargar los partidos' });
     }
   }, []);
 
-  // Initial load
+  // Initial load: marcar como no cancelado y pasar getIsCancelled para ignorar respuestas si el usuario cambió de fecha
   useEffect(() => {
-    loadMatches(selectedDate);
+    cancelledRef.current = false;
+    loadMatches(selectedDate, false, () => cancelledRef.current);
+    return () => {
+      cancelledRef.current = true;
+    };
   }, [selectedDate, loadMatches]);
 
   // Pull to refresh
   const onRefresh = useCallback(() => {
-    setRefreshing(true);
+    dispatch({ type: 'SET_REFRESHING', payload: true });
     loadMatches(selectedDate, true);
   }, [selectedDate, loadMatches]);
 
@@ -149,7 +309,7 @@ export default function MatchFeedScreen() {
   // Handle date selection
   const handleDateSelect = (date: string) => {
     setSelectedDate(date);
-    setLoading(true);
+    dispatch({ type: 'SET_LOADING', payload: true });
   };
 
   // Navigate to match detail (pass bankroll so detail can show "según tu bankroll de X€" if needed)
@@ -223,22 +383,6 @@ export default function MatchFeedScreen() {
     <MatchCard match={match} onPress={() => handleMatchPress(match)} />
   );
 
-  // Empty state
-  const renderEmptyState = () => {
-    const statusLabel = statusFilter === 'ALL' ? '' : statusFilter === 'completado' ? ' finalizados' : statusFilter === 'pendiente' ? ' por jugar' : ' en directo';
-    return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.emptyIcon}>🎾</Text>
-        <Text style={styles.emptyTitle}>
-          No hay partidos{statusLabel} para este día
-        </Text>
-        <Text style={styles.emptyText}>
-          {statusFilter !== 'ALL' ? 'Prueba otro filtro o ' : ''}Selecciona otra fecha para ver más partidos
-        </Text>
-      </View>
-    );
-  };
-
   // Loading state
   if (loading && !refreshing) {
     return (
@@ -267,8 +411,7 @@ export default function MatchFeedScreen() {
         <ErrorMessage
           message={error}
           onRetry={() => {
-            setLoading(true);
-            setError(null);
+            dispatch({ type: 'RETRY', payload: null });
             loadMatches(selectedDate);
           }}
         />
@@ -299,20 +442,11 @@ export default function MatchFeedScreen() {
         counts={statusCounts}
       />
 
-      {/* Match Count Summary */}
-      {statusFilteredMatches.length > 0 && (
-        <View style={styles.summaryBar}>
-          <Text style={styles.summaryText}>
-            {statusFilteredMatches.length} {statusFilteredMatches.length === 1 ? 'partido' : 'partidos'}
-            {statusFilter !== 'ALL' && ` (filtrado)`}
-          </Text>
-          {statusFilteredMatches.filter(isMatchInLiveTab).length > 0 && (
-            <Text style={styles.liveIndicator}>
-              🔴 {statusFilteredMatches.filter(isMatchInLiveTab).length} en vivo
-            </Text>
-          )}
-        </View>
-      )}
+      <FeedSummaryBar
+        count={statusFilteredMatches.length}
+        liveCount={statusFilteredMatches.filter(isMatchInLiveTab).length}
+        statusFilter={statusFilter}
+      />
 
       {/* Tournament Sections */}
       <ScrollView
@@ -327,7 +461,7 @@ export default function MatchFeedScreen() {
         }
       >
         {matchesByTournament.size === 0 ? (
-          renderEmptyState()
+          <FeedEmptyState statusFilter={statusFilter} />
         ) : (
           Array.from(matchesByTournament.entries()).map(([tournamentKey, tournamentMatches]) => {
             const parts = tournamentKey.split('_');
@@ -365,53 +499,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  summaryBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: COLORS.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  summaryText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: COLORS.textPrimary,
-  },
-  liveIndicator: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#FF4444',
-  },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     paddingVertical: 8,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 40,
-    marginTop: 60,
-  },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: COLORS.textPrimary,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  emptyText: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    textAlign: 'center',
   },
 });

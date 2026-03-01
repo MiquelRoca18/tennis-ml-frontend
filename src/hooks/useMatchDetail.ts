@@ -132,5 +132,3 @@ export function useMatchDetail(
         isLive,
     };
 }
-
-export default useMatchDetail;

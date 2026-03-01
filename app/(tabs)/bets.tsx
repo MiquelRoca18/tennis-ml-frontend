@@ -1,8 +1,10 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  AppState,
+  AppStateStatus,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -14,7 +16,7 @@ import {
 import { useAuth } from '../../src/contexts/AuthContext';
 import { getBets, removeBet, deleteBetWithoutRefund } from '../../src/services/betsService';
 import type { Bet } from '../../src/services/betsService';
-import { fetchMatchesStatusBatch } from '../../src/services/api/matchService';
+import { fetchMatchesStatusBatch, fetchRefreshResultsBatch } from '../../src/services/api/matchService';
 import { getShortName } from '../../src/types/matchDetail';
 import { fetchBettingSettings, updateBettingBankroll } from '../../src/services/api/matchService';
 import { COLORS } from '../../src/utils/constants';
@@ -69,6 +71,8 @@ export default function BetsScreen() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   /** matchId -> { match_date, match_time } desde status-batch */
   const [matchSchedule, setMatchSchedule] = useState<Record<string, { match_date?: string; match_time?: string }>>({});
+  /** True mientras la pestaña Mis apuestas está en foco (para refrescar al volver a la app) */
+  const isBetsFocusedRef = useRef(false);
 
   const handleDeleteBet = useCallback(
     (bet: Bet) => {
@@ -103,13 +107,20 @@ export default function BetsScreen() {
       const list = await getBets(user?.id);
       setBets(list);
 
-      // Liquidar apuestas de partidos ya completados (1 llamada batch en lugar de N fetchMatchFull)
+      // Liquidar apuestas de partidos ya completados
       if (list.length === 0) return;
       const matchIds = list.map((b) => b.matchId);
+      // Pedir al backend que actualice resultados de estos partidos antes de consultar estado
+      try {
+        await fetchRefreshResultsBatch(matchIds);
+      } catch (e) {
+        console.warn('[Bets] refresh-results-batch:', e);
+      }
       let statusMap: Record<string, { status: string; winner: number | null; match_date?: string; match_time?: string }> = {};
       try {
         statusMap = await fetchMatchesStatusBatch(matchIds);
-      } catch {
+      } catch (e) {
+        console.error('[Bets] status-batch failed:', e);
         // Si falla el batch, no liquidamos esta vez
       }
       const schedule: Record<string, { match_date?: string; match_time?: string }> = {};
@@ -158,10 +169,24 @@ export default function BetsScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      isBetsFocusedRef.current = true;
       setLoading(true);
       loadBets();
+      return () => {
+        isBetsFocusedRef.current = false;
+      };
     }, [loadBets])
   );
+
+  // Al volver a la app (de segundo plano a activo), refrescar apuestas si esta pestaña está visible
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (nextState: AppStateStatus) => {
+      if (nextState === 'active' && isBetsFocusedRef.current) {
+        loadBets();
+      }
+    });
+    return () => sub.remove();
+  }, [loadBets]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);

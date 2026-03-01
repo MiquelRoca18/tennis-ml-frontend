@@ -45,6 +45,7 @@ export default function MatchCard({ match, onPress, onFavoriteRemoved }: MatchCa
     const currentGameScore = scoresForDisplay?.live?.current_game_score;
     const isZeroZero = (s: string | null | undefined) =>
         s != null && String(s).trim().replace(/\s+/g, '-') === '0-0';
+    // Mostrar score si hay marcador, sets, o datos en vivo (incl. "0-0" + sacador para que la card no quede vacía en directo)
     const hasScoreToShow = Boolean(
         resultado && (
             (resultado.marcador && (resultado.marcador.trim() !== '0-0' || !showLiveOnCard))
@@ -52,6 +53,7 @@ export default function MatchCard({ match, onPress, onFavoriteRemoved }: MatchCa
                 (scoresForDisplay.sets?.length ?? 0) > 0
                 || (currentGameScore != null && !isZeroZero(currentGameScore))
                 || (scoresForDisplay.sets_result && String(scoresForDisplay.sets_result).trim() !== '0-0')
+                || (showLiveOnCard && scoresForDisplay.live && (scoresForDisplay.live.current_server != null || currentGameScore != null))
             ))
         )
     );

@@ -48,6 +48,18 @@ export type MatchStatusBatchResponse = Record<
 >;
 
 /**
+ * Fuerza en el backend la actualización de resultados (estado, ganador) para una lista de partidos.
+ * Llamar antes de status-batch al abrir Mis apuestas para que la liquidación use datos actualizados.
+ */
+export const fetchRefreshResultsBatch = async (matchIds: number[]): Promise<{ updated_count: number; errors: number }> => {
+  if (matchIds.length === 0) return { updated_count: 0, errors: 0 };
+  const response = await apiClient.post<{ updated_count: number; errors: number }>('/matches/refresh-results-batch', {
+    match_ids: matchIds,
+  });
+  return response.data;
+};
+
+/**
  * Obtiene estado y ganador de varios partidos en una sola llamada (para liquidar apuestas).
  */
 export const fetchMatchesStatusBatch = async (

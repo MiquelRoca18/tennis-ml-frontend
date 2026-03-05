@@ -7,9 +7,10 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { fetchMatchOddsDetailed, DetailedOddsResponse } from '../../../../../src/services/api/matchDetailService';
 import { MatchFullResponse, getShortName } from '../../../../../src/types/matchDetail';
+import { getBookmakerUrl } from '../../../../../src/utils/bookmakerUrls';
 import { COLORS } from '../../../../../src/utils/constants';
 
 interface OddsTabV2Props {
@@ -116,7 +117,7 @@ export default function OddsTabV2({ data, scrollable = true }: OddsTabV2Props) {
                         📊 Comparación de Cuotas ({bookmakers.length} casas)
                     </Text>
                     <Text style={styles.bookmakersSubtitle}>
-                        Ordenadas de mejor a peor
+                        Ordenadas de mejor a peor. Toca una casa para abrir su web.
                     </Text>
                 </View>
 
@@ -137,18 +138,27 @@ export default function OddsTabV2({ data, scrollable = true }: OddsTabV2Props) {
                 {bookmakers.map((bm, index) => {
                     const isP1Best = bm.player1_odds === bestP1 && bm.player1_odds !== null;
                     const isP2Best = bm.player2_odds === bestP2 && bm.player2_odds !== null;
-                    
+                    const bookmakerUrl = getBookmakerUrl(bm.bookmaker ?? '');
+                    const RowWrapper = bookmakerUrl ? TouchableOpacity : View;
+                    const rowProps = bookmakerUrl
+                        ? { onPress: () => Linking.openURL(bookmakerUrl), activeOpacity: 0.7 }
+                        : {};
                     return (
-                        <View 
+                        <RowWrapper
                             key={bm.bookmaker + index}
                             style={[
                                 styles.tableRow,
                                 index === bookmakers.length - 1 && styles.tableRowLast,
-                                index === 0 && styles.tableRowFirst
+                                index === 0 && styles.tableRowFirst,
+                                bookmakerUrl && styles.tableRowTappable
                             ]}
+                            {...rowProps}
                         >
                             <View style={styles.tableColBookmaker}>
-                                <Text style={styles.bookmakerName}>{bm.bookmaker}</Text>
+                                <Text style={[styles.bookmakerName, bookmakerUrl && styles.bookmakerNameLink]}>
+                                    {bm.bookmaker}
+                                    {bookmakerUrl ? ' ↗' : ''}
+                                </Text>
                                 {index === 0 && (
                                     <View style={styles.bestBadge}>
                                         <Text style={styles.bestBadgeText}>TOP</Text>
@@ -171,7 +181,7 @@ export default function OddsTabV2({ data, scrollable = true }: OddsTabV2Props) {
                                     {bm.player2_odds ? bm.player2_odds.toFixed(2) : '-'}
                                 </Text>
                             </View>
-                        </View>
+                        </RowWrapper>
                     );
                 })}
             </View>
@@ -353,10 +363,16 @@ const styles = StyleSheet.create({
         marginHorizontal: -8,
         paddingHorizontal: 8,
     },
+    tableRowTappable: {
+        paddingVertical: 14,
+    },
     bookmakerName: {
         fontSize: 14,
         fontWeight: '600',
         color: COLORS.textPrimary,
+    },
+    bookmakerNameLink: {
+        color: COLORS.primary,
     },
     bestBadge: {
         backgroundColor: COLORS.success,

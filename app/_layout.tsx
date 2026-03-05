@@ -75,7 +75,13 @@ export default function RootLayout() {
             <Stack.Screen name="match/[id]" />
             <Stack.Screen name="player/[key]" options={{ headerShown: false }} />
             <Stack.Screen name="tournament/[key]" options={{ headerShown: false }} />
-            <Stack.Screen name="search" options={{ title: 'Buscar' }} />
+            <Stack.Screen
+              name="search"
+              options={{
+                title: 'Buscar',
+                headerBackTitle: 'Atrás',
+              }}
+            />
             <Stack.Screen
               name="settings"
               options={{

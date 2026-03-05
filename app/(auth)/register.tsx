@@ -81,7 +81,7 @@ export default function RegisterScreen() {
   if (!isConfigured) {
     return (
       <View style={styles.container}>
-        <Text style={styles.title}>🎾 Tennis ML</Text>
+        <Text style={styles.title}>🎾 Tenly</Text>
         <Text style={styles.subtitle}>Configura Supabase para crear una cuenta</Text>
         <AuthButton title="Volver" onPress={() => router.replace('/(tabs)')} variant="secondary" />
       </View>
@@ -118,7 +118,7 @@ export default function RegisterScreen() {
         <TouchableOpacity style={styles.backButton} onPress={() => router.replace('/(tabs)')}>
           <Text style={styles.backText}>← Volver</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>🎾 Tennis ML</Text>
+        <Text style={styles.title}>🎾 Tenly</Text>
         <Text style={styles.subtitle}>Crea una cuenta para guardar tus favoritos</Text>
 
         <View style={styles.form}>

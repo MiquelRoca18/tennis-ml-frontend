@@ -7,7 +7,7 @@
  * - Tabs de navegación: Overview, Stats, H2H
  * 
  * Scroll unificado: toda la pantalla hace scroll (hero, tabs y contenido).
- * Usa el nuevo endpoint /v2/matches/{id}/full para obtener todos los datos.
+ * Usa el endpoint /matches/{id}/details para obtener todos los datos.
  */
 
 import React, { useState } from 'react';

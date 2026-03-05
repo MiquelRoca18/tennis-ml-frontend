@@ -2,8 +2,8 @@
  * Match Detail Service - Servicio para el detalle del partido
  * ===========================================================
  *
- * Llama al nuevo endpoint v2/matches/{id}/full que devuelve
- * todos los datos del partido en una sola llamada.
+ * Llama al endpoint /matches/{id}/details (alias del endpoint v2)
+ * que devuelve todos los datos del partido en una sola llamada.
  * Soporta ?live=false para primera carga rápida (sin enriquecimiento con API externa).
  */
 
@@ -28,7 +28,7 @@ export const fetchMatchFull = async (
   options: FetchMatchFullOptions = {}
 ): Promise<MatchFullResponse> => {
   const { live = true } = options;
-  const response = await apiClient.get<MatchFullResponse>(`/v2/matches/${matchId}/full`, {
+  const response = await apiClient.get<MatchFullResponse>(`/matches/${matchId}/details`, {
     params: { live: live ? 'true' : 'false' },
   });
   return response.data;
@@ -64,7 +64,7 @@ export const prefetchMatchFull = (matchId: number): void => {
  * @returns Timeline con juegos agrupados por set
  */
 export const fetchMatchTimeline = async (matchId: number): Promise<MatchTimeline> => {
-    const response = await apiClient.get<MatchTimeline>(`/v2/matches/${matchId}/timeline`);
+    const response = await apiClient.get<MatchTimeline>(`/matches/${matchId}/timeline`);
     return response.data;
 };
 
@@ -80,7 +80,7 @@ export const fetchMatchPointByPoint = async (
     setNumber?: number
 ): Promise<PointByPointData> => {
     const params = setNumber ? { set_number: setNumber } : {};
-    const response = await apiClient.get<PointByPointData>(`/v2/matches/${matchId}/pbp`, { params });
+    const response = await apiClient.get<PointByPointData>(`/matches/${matchId}/pbp`, { params });
     return response.data;
 };
 
@@ -109,7 +109,7 @@ export interface DetailedOddsResponse {
  * @returns Cuotas ordenadas de mejor a peor
  */
 export const fetchMatchOddsDetailed = async (matchId: number): Promise<DetailedOddsResponse> => {
-    const response = await apiClient.get<DetailedOddsResponse>(`/v2/matches/${matchId}/odds`);
+    const response = await apiClient.get<DetailedOddsResponse>(`/matches/${matchId}/odds`);
     return response.data;
 };
 

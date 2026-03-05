@@ -15,7 +15,7 @@ interface AppHeaderProps {
 }
 
 export default function AppHeader({
-  title = 'Tenis',
+  title = 'Tenly',
   subtitle,
   showSearch = true,
   showAccount = true,

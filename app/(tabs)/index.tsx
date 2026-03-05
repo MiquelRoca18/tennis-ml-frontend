@@ -387,7 +387,7 @@ export default function MatchFeedScreen() {
   if (loading && !refreshing) {
     return (
       <View style={styles.container}>
-        <AppHeader title="Tenis" showSearch showAccount />
+        <AppHeader title="Tenly" showSearch showAccount />
         <DateSelector
           dates={dateRange}
           selectedDate={selectedDate}
@@ -402,7 +402,7 @@ export default function MatchFeedScreen() {
   if (error && !refreshing) {
     return (
       <View style={styles.container}>
-        <AppHeader title="Tenis" showSearch showAccount />
+        <AppHeader title="Tenly" showSearch showAccount />
         <DateSelector
           dates={dateRange}
           selectedDate={selectedDate}
@@ -422,7 +422,7 @@ export default function MatchFeedScreen() {
   return (
     <View style={styles.container}>
       <AppHeader
-        title="Tenis"
+        title="Tenly"
         subtitle={formatDateLong(selectedDate)}
         showSearch
         showAccount

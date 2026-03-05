@@ -15,8 +15,8 @@ export const COLORS = {
   textSecondary: '#8B949E',
   textMuted: '#484F58',
 
-  // Brand colors
-  primary: '#4A90E2',         // Azul principal
+  // Brand colors (tono amarillento para Tenly, fondo oscuro)
+  primary: '#D4A84B',         // Amarillo/dorado suave
   secondary: '#6C757D',
   accent: '#FFC107',
   neonGreen: '#00FF41',       // Verde neón (live, success)
@@ -32,7 +32,7 @@ export const COLORS = {
   borderLight: '#21262D',
 
   // Surfaces
-  hard: '#4A90E2',
+  hard: '#D4A84B',
   clay: '#D2691E',
   grass: '#228B22',
 

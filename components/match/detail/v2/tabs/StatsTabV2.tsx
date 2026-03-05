@@ -2,7 +2,7 @@
  * StatsTabV2 - Tab de Estadísticas Profesional
  * ============================================
  * 
- * Carga estadísticas bajo demanda desde /v2/matches/{id}/stats
+ * Carga estadísticas bajo demanda desde /matches/{id}/stats
  * Muestra barras comparativas organizadas por categorías.
  */
 
@@ -46,7 +46,7 @@ export default function StatsTabV2({ data, scrollable = true }: StatsTabV2Props)
         try {
             setLoading(true);
             setError(null);
-            const response = await apiClient.get<MatchStats>(`/v2/matches/${data.match.id}/stats`);
+            const response = await apiClient.get<MatchStats>(`/matches/${data.match.id}/stats`);
             setStats(response.data);
         } catch (err: any) {
             setError('Error al cargar estadísticas');

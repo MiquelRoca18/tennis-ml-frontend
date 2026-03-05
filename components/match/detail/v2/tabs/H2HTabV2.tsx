@@ -3,7 +3,7 @@
  * ===============================
  * 
  * Muestra el historial de enfrentamientos entre los jugadores.
- * Carga los datos bajo demanda desde el endpoint /v2/matches/{id}/h2h
+ * Carga los datos bajo demanda desde el endpoint /matches/{id}/h2h
  */
 
 import React, { useEffect, useState } from 'react';
@@ -67,7 +67,7 @@ export default function H2HTabV2({ data, scrollable = true }: H2HTabV2Props) {
         try {
             setLoading(true);
             setError(null);
-            const response = await apiClient.get<H2HResponse>(`/v2/matches/${data.match.id}/h2h`);
+            const response = await apiClient.get<H2HResponse>(`/matches/${data.match.id}/h2h`);
             setH2hData(response.data);
         } catch (err) {
             setError('Error al cargar el historial');

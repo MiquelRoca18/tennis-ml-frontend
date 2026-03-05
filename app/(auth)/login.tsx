@@ -75,7 +75,7 @@ export default function LoginScreen() {
   if (!isConfigured) {
     return (
       <View style={styles.container}>
-        <Text style={styles.title}>🎾 Tennis ML</Text>
+        <Text style={styles.title}>🎾 Tenly</Text>
         <Text style={styles.subtitle}>Configura Supabase para acceder a tu cuenta</Text>
         <AuthButton title="Volver" onPress={() => router.replace('/(tabs)')} variant="secondary" />
       </View>
@@ -96,7 +96,7 @@ export default function LoginScreen() {
           <Text style={styles.backText}>← Volver</Text>
         </TouchableOpacity>
 
-        <Text style={styles.title}>🎾 Tennis ML</Text>
+        <Text style={styles.title}>🎾 Tenly</Text>
         <Text style={styles.subtitle}>Inicia sesión para sincronizar tus favoritos</Text>
 
         <View style={styles.form}>

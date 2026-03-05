@@ -11,7 +11,7 @@ export const Colors = {
     // === COLORES DE MARCA ===
     brand: {
         neonGreen: '#00FF88',    // Color primario (éxito, victorias)
-        electricBlue: '#00D9FF', // Acento secundario (información)
+        electricBlue: '#D4A84B', // Acento (amarillo/dorado Tenly)
         coralRed: '#FF6B6B',     // Pérdidas, errores
         liveRed: '#FF3B30',      // Partidos en vivo
         gold: '#FFD700',         // Premium, favoritos

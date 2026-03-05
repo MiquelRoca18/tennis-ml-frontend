@@ -48,6 +48,12 @@ export default function PlayerProfilePage() {
     if (playerLoading) {
         return (
             <View style={styles.loadingContainer}>
+                <TouchableOpacity
+                    onPress={() => router.back()}
+                    style={[styles.backButtonTop, { top: Math.max(16, insets.top) + 8 }]}
+                >
+                    <Text style={styles.backButtonText}>← Volver</Text>
+                </TouchableOpacity>
                 <ActivityIndicator size="large" color={COLORS.primary} />
                 <Text style={styles.loadingText}>Cargando perfil...</Text>
             </View>
@@ -253,6 +259,13 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         backgroundColor: COLORS.background,
     },
+    backButtonTop: {
+        position: 'absolute',
+        left: 16,
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        zIndex: 1,
+    },
     loadingText: {
         marginTop: 12,
         fontSize: 14,
@@ -293,6 +306,6 @@ const styles = StyleSheet.create({
     backButtonText: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#FFFFFF',
+        color: COLORS.primary,
     },
 });

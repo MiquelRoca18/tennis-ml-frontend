@@ -40,16 +40,15 @@ En la pantalla de detalle encontrarás:
 
 ## 4. Mis apuestas
 
-- **Qué es**: Lista de apuestas que has registrado (o que la app ha sugerido y tú has confirmado).
-- **Ver estado**: Cada apuesta muestra partido, jugador elegido, cuota, stake y estado (pendiente, ganada, perdida).
-- **Actualizar resultados**: Usa **Actualizar resultados** para que la app consulte el backend y marque ganadas/perdidas según el resultado real.
-- **Eliminar apuesta**: Puedes eliminar una apuesta si la registraste por error (según la opción disponible en la pantalla).
+- **Qué es**: Lista de apuestas que has registrado.
+- **Ver estado**: Cada apuesta muestra partido, jugador elegido, cuota, y stake.
+- **Eliminar apuesta**: Puedes eliminar una apuesta si la registraste por error o si la quieres cancelar.
 
 ---
 
 ## 5. Torneos (Explorar)
 
-- **Qué hay**: Listado de torneos (ATP, WTA, etc.) y acceso a **Rankings**.
+- **Qué hay**: Listado de torneos y acceso a **Rankings**.
 - **Torneos**: Pulsa un torneo para ver sus partidos o información disponible.
 - **Rankings**: Consulta el ranking actual de los jugadores.
 

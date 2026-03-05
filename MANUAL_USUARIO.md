@@ -38,7 +38,7 @@ En la pantalla de detalle encontrarás, dependiendo del estado del partido:
 - **Partido en directo o finalizado**:
   - Marcador en tiempo real o resultado final (sets, juegos, tie-breaks).
   - Pestañas con más detalle: timeline de puntos/juegos, punto a punto, estadísticas avanzadas del partido, H2H (enfrentamientos directos), odds, etc.
-- **Acciones rápidas**: desde aquí puedes marcar el partido o los jugadores como favoritos y acceder al enlace hacia el perfil de cada jugador.
+- **Acciones rápidas**: desde aquí puedes marcar el partido como favorito y acceder al perfil de cada jugador.
 
 ---
 

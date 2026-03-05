@@ -5,6 +5,8 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../src/utils/constants';
 
+import TenlyLogo from '../../assets/images/tenly-logo.svg';
+
 interface AppHeaderProps {
   title?: string;
   subtitle?: string;
@@ -26,7 +28,9 @@ export default function AppHeader({
   return (
     <View style={[styles.header, { paddingTop: Math.max(insets.top, 12) + 8 }]}>
       <View style={styles.left}>
-        <Text style={styles.title}>{title}</Text>
+        <View style={styles.titleRow}>
+          <TenlyLogo width={112} height={38} style={styles.logo} />
+        </View>
         {subtitle != null && subtitle !== '' && (
           <Text style={styles.subtitle} numberOfLines={1}>{subtitle}</Text>
         )}
@@ -60,13 +64,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingBottom: 12,
     backgroundColor: COLORS.surface,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
   left: { flex: 1 },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 6,
+    marginTop: 2,
+  },
+  logo: {
+    flexShrink: 0,
+  },
   title: {
     fontSize: 22,
     fontWeight: '700',

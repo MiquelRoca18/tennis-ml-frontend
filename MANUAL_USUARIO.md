@@ -23,18 +23,22 @@ Manual básico para usar **Tenly**, la aplicación móvil y web de tenis: partid
   - **Completados**
 - **Refrescar**: Arrastra hacia abajo para actualizar la lista.
 - **Entrar a un partido**: Pulsa una tarjeta de partido para abrir el **detalle** (marcador, predicción, cuotas, estadísticas, etc.).
+- **Ver perfil de jugador**: En la mayoría de pantallas puedes pulsar el nombre de un jugador para abrir su perfil (estadísticas y partidos asociados).
 
 ---
 
 ## 3. Detalle de un partido
 
-En la pantalla de detalle encontrarás:
+En la pantalla de detalle encontrarás, dependiendo del estado del partido:
 
-- **Jugadores y torneo**: Nombres, superficie (pista dura, tierra batida, hierba) y ronda.
-- **Marcador**: Sets y juegos (si el partido está en juego o finalizado).
-- **Predicción**: Probabilidad estimada de victoria para cada jugador, **EV** (valor esperado) y recomendación (por ejemplo **APOSTAR** / **NO APOSTAR**).
-- **Cuotas**: Cuotas de las casas de apuestas y, si aplica, cuota sugerida y stake (cantidad recomendada).
-- **Pestañas adicionales**: Timeline, punto a punto, estadísticas, H2H (enfrentamientos directos), según lo que ofrezca la pantalla.
+- **Información básica**: Jugadores, torneo, superficie (pista dura, tierra batida, hierba) y ronda.
+- **Partido pendiente**:
+  - Predicción principal (probabilidad estimada de victoria, **EV** y recomendación **APOSTAR / NO APOSTAR**).
+  - Cuotas y, si aplica, stake recomendado según tu bankroll.
+- **Partido en directo o finalizado**:
+  - Marcador en tiempo real o resultado final (sets, juegos, tie-breaks).
+  - Pestañas con más detalle: timeline de puntos/juegos, punto a punto, estadísticas avanzadas del partido, H2H (enfrentamientos directos), odds, etc.
+- **Acciones rápidas**: desde aquí puedes marcar el partido o los jugadores como favoritos y acceder al enlace hacia el perfil de cada jugador.
 
 ---
 
@@ -54,7 +58,18 @@ En la pantalla de detalle encontrarás:
 
 ---
 
-## 6. Favoritos
+## 6. Perfiles de jugador y búsqueda
+
+- **Perfiles de jugador**: Puedes acceder al perfil de un jugador desde la lista de partidos, el detalle de un partido o resultados anteriores. En el perfil verás:
+  - Información básica del jugador.
+  - **Próximos partidos** si tiene encuentros programados.
+  - **Partidos recientes** con resultados y marcador.
+  - Pestañas por temporada (**TEMPORADA**, **TORNEOS**, **PARTIDOS**) con estadísticas y torneos en los que ha jugado.
+- **Búsqueda por texto**: Desde la pantalla de búsqueda puedes escribir el nombre de un jugador o torneo para encontrarlo rápidamente y abrir su perfil o la lista de partidos asociados.
+
+---
+
+## 7. Favoritos
 
 - **Añadir favoritos**: Desde el detalle de un partido o desde la lista, usa el icono de estrella para marcar jugadores o partidos como favoritos.
 - **Ver favoritos**: En la pestaña **Favoritos** verás los partidos o jugadores guardados. El número en la pestaña indica cuántos tienes.
@@ -62,7 +77,7 @@ En la pantalla de detalle encontrarás:
 
 ---
 
-## 7. Cuenta
+## 8. Cuenta
 
 - **Sin sesión**: Opciones para **Iniciar sesión** o **Registrarse**. Enlace a **Configuración** (Ajustes).
 - **Con sesión**: Se muestra tu email y opciones como:
@@ -71,7 +86,7 @@ En la pantalla de detalle encontrarás:
 
 ---
 
-## 8. Ajustes (Configuración)
+## 9. Ajustes (Configuración)
 
 Desde **Cuenta** → **Configuración** (o el acceso que tengas a Ajustes):
 
@@ -82,7 +97,7 @@ Si no has iniciado sesión, el bankroll se guarda solo en el dispositivo; con se
 
 ---
 
-## 9. Ejecutar Tenly en local
+## 10. Ejecutar Tenly en local
 
 Si quieres descargar el código y tener la app en tu ordenador:
 

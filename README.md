@@ -2,7 +2,7 @@
 
 Aplicación móvil y web **Tenly** (Expo / React Native): partidos de tenis, predicciones, apuestas y seguimiento. Conecta con la API de Tenly desplegada en Railway.
 
-**Documentación:** [Manual de usuario](docs/MANUAL_USUARIO.md) · [Documentación técnica](docs/DOCUMENTACION_TECNICA.md)
+**Documentación:** [Manual de usuario](MANUAL_USUARIO.md) · [Documentación técnica](DOCUMENTACION_TECNICA.md)
 
 ## Get started
 

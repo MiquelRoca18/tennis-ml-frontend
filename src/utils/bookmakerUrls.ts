@@ -50,3 +50,18 @@ export function getBookmakerUrl(bookmakerName: string): string | null {
   const key = normalizeBookmakerName(bookmakerName);
   return BOOKMAKER_URLS[key] ?? null;
 }
+
+/**
+ * Devuelve la URL del logo/favicon de la casa (Google Favicon API; más fiable que Clearbit).
+ * Si no tenemos web URL, devuelve null.
+ */
+export function getBookmakerLogoUrl(bookmakerName: string): string | null {
+  const url = getBookmakerUrl(bookmakerName);
+  if (!url) return null;
+  try {
+    const domain = new URL(url).hostname.replace(/^www\./, '');
+    return `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
+  } catch {
+    return null;
+  }
+}

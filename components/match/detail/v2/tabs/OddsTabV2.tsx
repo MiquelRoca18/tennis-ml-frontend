@@ -6,12 +6,36 @@
  * Obtiene las cuotas directamente de la API Tennis.
  */
 
+import { Image } from 'expo-image';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { fetchMatchOddsDetailed, DetailedOddsResponse } from '../../../../../src/services/api/matchDetailService';
 import { MatchFullResponse, getShortName } from '../../../../../src/types/matchDetail';
-import { getBookmakerUrl } from '../../../../../src/utils/bookmakerUrls';
+import { getBookmakerLogoUrl, getBookmakerUrl } from '../../../../../src/utils/bookmakerUrls';
 import { COLORS } from '../../../../../src/utils/constants';
+
+/** Logo de la casa o fallback con inicial */
+function BookmakerLogo({ name, logoUrl }: { name: string; logoUrl: string | null }) {
+    const [error, setError] = useState(false);
+    const showFallback = !logoUrl || error;
+    const initial = (name || '?').trim().charAt(0).toUpperCase();
+    return (
+        <View style={styles.logoWrap}>
+            {showFallback ? (
+                <View style={styles.logoFallback}>
+                    <Text style={styles.logoFallbackText}>{initial}</Text>
+                </View>
+            ) : (
+                <Image
+                    source={{ uri: logoUrl }}
+                    style={styles.logoImage}
+                    contentFit="contain"
+                    onError={() => setError(true)}
+                />
+            )}
+        </View>
+    );
+}
 
 interface OddsTabV2Props {
     data: MatchFullResponse;
@@ -139,6 +163,7 @@ export default function OddsTabV2({ data, scrollable = true }: OddsTabV2Props) {
                     const isP1Best = bm.player1_odds === bestP1 && bm.player1_odds !== null;
                     const isP2Best = bm.player2_odds === bestP2 && bm.player2_odds !== null;
                     const bookmakerUrl = getBookmakerUrl(bm.bookmaker ?? '');
+                    const logoUrl = getBookmakerLogoUrl(bm.bookmaker ?? '');
                     const RowWrapper = bookmakerUrl ? TouchableOpacity : View;
                     const rowProps = bookmakerUrl
                         ? { onPress: () => Linking.openURL(bookmakerUrl), activeOpacity: 0.7 }
@@ -155,6 +180,7 @@ export default function OddsTabV2({ data, scrollable = true }: OddsTabV2Props) {
                             {...rowProps}
                         >
                             <View style={styles.tableColBookmaker}>
+                                <BookmakerLogo name={bm.bookmaker ?? ''} logoUrl={logoUrl} />
                                 <Text style={[styles.bookmakerName, bookmakerUrl && styles.bookmakerNameLink]}>
                                     {bm.bookmaker}
                                     {bookmakerUrl ? ' ↗' : ''}
@@ -341,7 +367,32 @@ const styles = StyleSheet.create({
         paddingLeft: 12,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
+        gap: 10,
+    },
+    logoWrap: {
+        width: 32,
+        height: 32,
+        borderRadius: 8,
+        overflow: 'hidden',
+        backgroundColor: COLORS.background,
+    },
+    logoImage: {
+        width: 32,
+        height: 32,
+        borderRadius: 8,
+    },
+    logoFallback: {
+        width: 32,
+        height: 32,
+        borderRadius: 8,
+        backgroundColor: COLORS.border,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    logoFallbackText: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: COLORS.textSecondary,
     },
     tableColOdds: {
         flex: 1,

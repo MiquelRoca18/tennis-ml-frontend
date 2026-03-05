@@ -36,6 +36,32 @@ function mapFullResponseToMatch(data: MatchFullResponse): Match {
     })
     .join(', ');
 
+  const hasScores = scores && ((scores.sets?.length ?? 0) > 0 || scores.live);
+  const resultScores =
+    hasScores && scores
+      ? {
+          sets_result: scores.sets_won ? `${scores.sets_won[0]}-${scores.sets_won[1]}` : undefined,
+          sets: setsForResult ?? [],
+          live: scores.live
+            ? {
+                current_game_score: scores.live.current_game,
+                current_server: scores.live.current_server === 1 ? 'First Player' : 'Second Player',
+                current_set: scores.live.current_set,
+                is_tiebreak: scores.live.is_tiebreak,
+              }
+            : undefined,
+        }
+      : undefined;
+
+  const resultado: Match['resultado'] =
+    hasScores || winner
+      ? {
+          ganador: ganador ?? undefined,
+          marcador: marcador ?? undefined,
+          scores: resultScores,
+        }
+      : null;
+
   return {
     id: match.id,
     event_key: match.id.toString(),
@@ -67,18 +93,7 @@ function mapFullResponseToMatch(data: MatchFullResponse): Match {
     },
     cuotas_top3: { top3_player1: [], top3_player2: [] },
     prediccion: null,
-    resultado: winner
-      ? {
-          ganador: ganador ?? undefined,
-          marcador: marcador ?? undefined,
-          scores: scores
-            ? {
-                sets_result: scores.sets_won ? `${scores.sets_won[0]}-${scores.sets_won[1]}` : undefined,
-                sets: setsForResult ?? [],
-              }
-            : undefined,
-        }
-      : null,
+    resultado,
     event_status: match.event_status ?? undefined,
   } as Match;
 }

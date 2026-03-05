@@ -1,6 +1,8 @@
-# Welcome to your Expo app 👋
+# Tenly — App (Frontend)
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Aplicación móvil y web **Tenly** (Expo / React Native): partidos de tenis, predicciones, apuestas y seguimiento. Conecta con la API de Tenly desplegada en Railway.
+
+**Documentación:** [Manual de usuario](docs/MANUAL_USUARIO.md) · [Documentación técnica](docs/DOCUMENTACION_TECNICA.md)
 
 ## Get started
 

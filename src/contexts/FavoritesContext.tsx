@@ -8,6 +8,8 @@ import { getFavorites, toggleFavorite } from '../services/favoritesService';
 import { useAuth } from './AuthContext';
 import { useFavoritesRefresh } from './FavoritesRefreshContext';
 
+export const FAVORITE_REQUIRES_LOGIN = 'requires_login' as const;
+
 interface FavoritesContextValue {
   favorites: Favorite[];
   favoriteMatchIds: Set<number>;
@@ -16,7 +18,7 @@ interface FavoritesContextValue {
   toggle: (
     matchId: number,
     matchData: { player1Name: string; player2Name: string; tournament: string; eventKey?: string }
-  ) => Promise<boolean>;
+  ) => Promise<boolean | typeof FAVORITE_REQUIRES_LOGIN>;
 }
 
 const FavoritesContext = createContext<FavoritesContextValue | null>(null);
@@ -28,37 +30,38 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const hasLoadedOnce = useRef(false);
 
-  const loadFavorites = useCallback(async () => {
+  const loadFavorites = useCallback(async (forceRefresh = false) => {
     if (!hasLoadedOnce.current) setLoading(true);
-    const list = await getFavorites(user?.id);
+    const list = await getFavorites(user?.id, { forceRefresh });
     hasLoadedOnce.current = true;
     setFavorites(list);
     setLoading(false);
   }, [user?.id]);
 
   useEffect(() => {
-    loadFavorites();
+    loadFavorites(false);
   }, [loadFavorites, refreshTrigger]);
 
   const refresh = useCallback(async () => {
-    await loadFavorites();
+    await loadFavorites(true);
   }, [loadFavorites]);
 
   const toggle = useCallback(
     async (
       matchId: number,
       matchData: { player1Name: string; player2Name: string; tournament: string; eventKey?: string }
-    ): Promise<boolean> => {
+    ): Promise<boolean | typeof FAVORITE_REQUIRES_LOGIN> => {
+      if (!user) return FAVORITE_REQUIRES_LOGIN;
       const newStatus = await toggleFavorite(
         matchId,
         matchData,
-        user?.id,
+        user.id,
         matchData.eventKey ?? null
       );
       await loadFavorites();
       return newStatus;
     },
-    [user?.id, loadFavorites]
+    [user, loadFavorites]
   );
 
   const favoriteMatchIds = useMemo(

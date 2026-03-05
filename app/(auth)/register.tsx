@@ -4,42 +4,78 @@ import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, Touchable
 import AuthButton from '../../components/auth/AuthButton';
 import AuthInput from '../../components/auth/AuthInput';
 import { useAuth } from '../../src/contexts/AuthContext';
+import { validateEmail, validatePassword } from '../../src/utils/authValidation';
 import { COLORS } from '../../src/utils/constants';
 
 export default function RegisterScreen() {
   const router = useRouter();
-  const { signUp, isConfigured } = useAuth();
+  const { signUp, signOut, isConfigured, user, lastSignOutAt } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [registered, setRegistered] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState('');
+
+  const AUTH_TIMEOUT_MS = 25_000;
+  const RECENT_SIGNOUT_MS = 4000;
+  const DELAY_AFTER_RECENT_SIGNOUT_MS = 900;
+
   const handleRegister = async () => {
     setError(null);
-    if (!email.trim() || !password || !confirmPassword) {
-      setError('Completa todos los campos');
+    const emailCheck = validateEmail(email);
+    if (!emailCheck.valid) {
+      setError(emailCheck.message ?? 'Correo no válido.');
       return;
     }
-    if (password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres');
+    if (!password || !confirmPassword) {
+      setError('Completa todos los campos.');
+      return;
+    }
+    const passwordCheck = validatePassword(password, { emailForLocalPart: email.trim() });
+    if (!passwordCheck.valid) {
+      setError(passwordCheck.message ?? 'Contraseña no válida.');
       return;
     }
     if (password !== confirmPassword) {
-      setError('Las contraseñas no coinciden');
+      setError('Las contraseñas no coinciden.');
       return;
     }
 
     setLoading(true);
-    const { error: authError } = await signUp(email.trim(), password);
-    setLoading(false);
-
-    if (authError) {
-      setError(authError.message);
-      return;
+    try {
+      if (user) {
+        await signOut();
+      }
+      if (lastSignOutAt && Date.now() - lastSignOutAt < RECENT_SIGNOUT_MS) {
+        await new Promise((r) => setTimeout(r, DELAY_AFTER_RECENT_SIGNOUT_MS));
+      }
+      const result = await Promise.race([
+        signUp(email.trim(), password),
+        new Promise<{ error: Error | null }>((_, reject) =>
+          setTimeout(() => reject(new Error('timeout')), AUTH_TIMEOUT_MS)
+        ),
+      ]);
+      const authError = result.error;
+      if (authError) {
+        const msg = authError.message;
+        if (/security purposes|only request this after|seconds/i.test(msg)) setError('Demasiados intentos. Espera unos 20–30 segundos e inténtalo de nuevo.');
+        else setError(msg);
+        return;
+      }
+      setRegisteredEmail(email.trim());
+      setRegistered(true);
+    } catch (e: any) {
+      if (e?.message === 'timeout') {
+        setError('El servidor no respondió. Comprueba tu conexión e inténtalo de nuevo.');
+      } else {
+        setError(e?.message ?? 'Error de conexión. Inténtalo de nuevo.');
+      }
+    } finally {
+      setLoading(false);
     }
-
-    router.replace('/(tabs)');
   };
 
   if (!isConfigured) {
@@ -48,6 +84,23 @@ export default function RegisterScreen() {
         <Text style={styles.title}>🎾 Tennis ML</Text>
         <Text style={styles.subtitle}>Configura Supabase para crear una cuenta</Text>
         <AuthButton title="Volver" onPress={() => router.replace('/(tabs)')} variant="secondary" />
+      </View>
+    );
+  }
+
+  if (registered) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.successContainer}>
+          <Text style={styles.successIcon}>✉️</Text>
+          <Text style={styles.successTitle}>Revisa tu correo</Text>
+          <Text style={styles.successText}>
+            Hemos enviado un enlace de confirmación a {registeredEmail}. Pulsa el enlace para activar tu cuenta y luego inicia sesión.
+          </Text>
+          <View style={styles.successButtonWrap}>
+            <AuthButton title="Ir a Iniciar sesión" onPress={() => router.replace('/(auth)/login')} />
+          </View>
+        </View>
       </View>
     );
   }
@@ -62,6 +115,9 @@ export default function RegisterScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
+        <TouchableOpacity style={styles.backButton} onPress={() => router.replace('/(tabs)')}>
+          <Text style={styles.backText}>← Volver</Text>
+        </TouchableOpacity>
         <Text style={styles.title}>🎾 Tennis ML</Text>
         <Text style={styles.subtitle}>Crea una cuenta para guardar tus favoritos</Text>
 
@@ -116,8 +172,45 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 24,
-    paddingTop: 80,
+    paddingTop: 60,
     paddingBottom: 40,
+  },
+  backButton: {
+    alignSelf: 'flex-start',
+    marginBottom: 24,
+  },
+  backText: {
+    fontSize: 16,
+    color: COLORS.primary,
+    fontWeight: '600',
+  },
+  successContainer: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingTop: 80,
+    alignItems: 'center',
+  },
+  successIcon: {
+    fontSize: 64,
+    marginBottom: 24,
+  },
+  successTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  successText: {
+    fontSize: 16,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginBottom: 32,
+    lineHeight: 24,
+  },
+  successButtonWrap: {
+    alignSelf: 'stretch',
+    width: '100%',
   },
   title: {
     fontSize: 32,

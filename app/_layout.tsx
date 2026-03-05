@@ -16,6 +16,7 @@ import 'react-native-reanimated';
 import { Colors } from '@/constants/Colors';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { AuthProvider } from '@/src/contexts/AuthContext';
+import { BankrollProvider } from '@/src/contexts/BankrollContext';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -58,6 +59,7 @@ export default function RootLayout() {
 
   return (
     <AuthProvider>
+      <BankrollProvider>
       <ThemeProvider>
         <NavigationThemeProvider value={CustomDarkTheme}>
           <Stack
@@ -86,6 +88,7 @@ export default function RootLayout() {
           <StatusBar style="light" />
         </NavigationThemeProvider>
       </ThemeProvider>
+      </BankrollProvider>
     </AuthProvider>
   );
 }

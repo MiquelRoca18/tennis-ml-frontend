@@ -106,7 +106,7 @@ export default function FavoritesScreen() {
         <Text style={styles.headerTitle}>⭐ Favoritos</Text>
         {user && (
           <Text style={styles.headerSubtitle}>
-            {favorites.length} {favorites.length === 1 ? 'partido' : 'partidos'} guardados
+            {refreshing ? 'Actualizando…' : `${favorites.length} ${favorites.length === 1 ? 'partido' : 'partidos'} guardados`}
           </Text>
         )}
       </View>
@@ -194,7 +194,7 @@ export default function FavoritesScreen() {
                 key={tournamentName}
                 tournamentName={tournamentName}
                 favorites={tournamentFavorites}
-                initiallyExpanded={favoritesByTournament.size <= 3}
+                initiallyExpanded={false}
                 onFavoriteRemoved={refresh}
               />
             ))}

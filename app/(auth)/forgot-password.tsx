@@ -4,6 +4,7 @@ import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, Touchable
 import AuthButton from '../../components/auth/AuthButton';
 import AuthInput from '../../components/auth/AuthInput';
 import { useAuth } from '../../src/contexts/AuthContext';
+import { validateEmail } from '../../src/utils/authValidation';
 import { COLORS } from '../../src/utils/constants';
 
 export default function ForgotPasswordScreen() {
@@ -14,23 +15,44 @@ export default function ForgotPasswordScreen() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
+  const AUTH_TIMEOUT_MS = 25_000;
+
   const handleReset = async () => {
     setError(null);
-    if (!email.trim()) {
-      setError('Introduce tu email');
+    const emailCheck = validateEmail(email);
+    if (!emailCheck.valid) {
+      setError(emailCheck.message ?? 'Introduce tu correo electrónico.');
       return;
     }
 
     setLoading(true);
-    const { error: authError } = await resetPassword(email.trim());
-    setLoading(false);
-
-    if (authError) {
-      setError(authError.message);
-      return;
+    try {
+      const result = await Promise.race([
+        resetPassword(email.trim()),
+        new Promise<{ error: Error | null }>((_, reject) =>
+          setTimeout(() => reject(new Error('timeout')), AUTH_TIMEOUT_MS)
+        ),
+      ]);
+      const authError = result.error;
+      if (authError) {
+        const msg = authError.message;
+        if (/rate limit|rate_limit/i.test(msg)) {
+          setError('Demasiados intentos de envío. Espera unos minutos e inténtalo de nuevo.');
+        } else {
+          setError(msg);
+        }
+        return;
+      }
+      setSuccess(true);
+    } catch (e: any) {
+      if (e?.message === 'timeout') {
+        setError('El servidor no respondió. Comprueba tu conexión e inténtalo de nuevo.');
+      } else {
+        setError(e?.message ?? 'Error. Inténtalo de nuevo.');
+      }
+    } finally {
+      setLoading(false);
     }
-
-    setSuccess(true);
   };
 
   if (!isConfigured) {
@@ -52,7 +74,9 @@ export default function ForgotPasswordScreen() {
           <Text style={styles.successText}>
             Si existe una cuenta con {email}, recibirás un enlace para restablecer tu contraseña.
           </Text>
-          <AuthButton title="Volver al login" onPress={() => router.replace('/(auth)/login')} />
+          <View style={styles.successButtonWrap}>
+            <AuthButton title="Volver al login" onPress={() => router.replace('/(auth)/login')} />
+          </View>
         </View>
       </View>
     );
@@ -159,5 +183,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 32,
     lineHeight: 24,
+  },
+  successButtonWrap: {
+    alignSelf: 'stretch',
+    width: '100%',
+  },
+  devLink: {
+    marginTop: 24,
+  },
+  devLinkText: {
+    fontSize: 14,
+    color: COLORS.primary,
+    fontWeight: '500',
   },
 });

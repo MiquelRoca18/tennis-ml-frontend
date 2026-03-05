@@ -13,7 +13,7 @@ export default function AccountScreen() {
   const handleDeleteAccount = () => {
     Alert.alert(
       '⚠️ Borrar cuenta',
-      'Se eliminarán todos tus datos (favoritos, etc.). Esta acción no se puede deshacer.',
+      'Se eliminarán todos tus datos (favoritos, apuestas, etc.). Esta acción no se puede deshacer.',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
@@ -52,22 +52,16 @@ export default function AccountScreen() {
       <View style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Cuenta</Text>
+          <Text style={styles.headerSubtitle}>Configura Supabase para acceder</Text>
         </View>
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-          <TouchableOpacity
-            style={styles.settingsRow}
-            onPress={() => router.push('/settings')}
-          >
-            <Text style={styles.settingsRowLabel}>Configuración (bankroll y apuestas)</Text>
+          <TouchableOpacity style={styles.cardRow} onPress={() => router.push('/settings')}>
+            <Text style={styles.cardRowLabel}>⚙️ Configuración</Text>
             <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
-          <View style={styles.content}>
-            <Text style={styles.placeholderText}>
-              Configura Supabase para acceder a tu cuenta
-            </Text>
-            <Text style={styles.hintText}>
-              Añade EXPO_PUBLIC_SUPABASE_URL y EXPO_PUBLIC_SUPABASE_ANON_KEY en .env
-            </Text>
+          <View style={styles.placeholderBlock}>
+            <Text style={styles.placeholderText}>Configura Supabase para acceder a tu cuenta</Text>
+            <Text style={styles.hintText}>Añade EXPO_PUBLIC_SUPABASE_URL y EXPO_PUBLIC_SUPABASE_ANON_KEY en .env</Text>
           </View>
         </ScrollView>
       </View>
@@ -78,34 +72,28 @@ export default function AccountScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
+          <View style={styles.badgeRow}>
+            <View style={styles.sessionBadge}>
+              <Text style={styles.sessionBadgeDot}>●</Text>
+              <Text style={styles.sessionBadgeText}>Sesión iniciada</Text>
+            </View>
+          </View>
           <Text style={styles.headerTitle}>Cuenta</Text>
-          <Text style={styles.headerSubtitle}>Sesión iniciada</Text>
+          <Text style={styles.headerSubtitle}>{user.email}</Text>
         </View>
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-          <View style={styles.section}>
-            <Text style={styles.label}>Email</Text>
-            <Text style={styles.value}>{user.email}</Text>
-          </View>
-          <TouchableOpacity
-            style={styles.settingsRow}
-            onPress={() => router.push('/settings')}
-          >
-            <Text style={styles.settingsRowLabel}>Configuración (bankroll, apuestas)</Text>
+          <Text style={[styles.sectionTitle, styles.sectionTitleFirst]}>Ajustes</Text>
+          <TouchableOpacity style={styles.cardRow} onPress={() => router.push('/settings')}>
+            <Text style={styles.cardRowLabel}>Bankroll y preferencias</Text>
             <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
-          <AuthButton
-            title="Cerrar sesión"
-            onPress={() => signOut()}
-            variant="secondary"
-          />
-          <TouchableOpacity
-            style={styles.dangerRow}
-            onPress={handleDeleteAccount}
-            disabled={deleting}
-          >
-            <Text style={styles.dangerText}>
-              {deleting ? 'Borrando...' : 'Borrar cuenta'}
-            </Text>
+
+          <Text style={styles.sectionTitle}>Sesión</Text>
+          <AuthButton title="Cerrar sesión" onPress={() => signOut()} variant="secondary" />
+
+          <Text style={[styles.sectionTitle, styles.dangerSectionTitle]}>Zona peligro</Text>
+          <TouchableOpacity style={styles.dangerRow} onPress={handleDeleteAccount} disabled={deleting}>
+            <Text style={styles.dangerRowText}>{deleting ? 'Borrando…' : 'Borrar cuenta'}</Text>
           </TouchableOpacity>
         </ScrollView>
       </View>
@@ -116,25 +104,20 @@ export default function AccountScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Cuenta</Text>
-        <Text style={styles.headerSubtitle}>Inicia sesión para sincronizar tus favoritos</Text>
+        <Text style={styles.headerSubtitle}>Inicia sesión para sincronizar favoritos y apuestas</Text>
       </View>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        <TouchableOpacity
-          style={styles.settingsRow}
-          onPress={() => router.push('/settings')}
-        >
-          <Text style={styles.settingsRowLabel}>Configuración (bankroll, apuestas)</Text>
+        <Text style={[styles.sectionTitle, styles.sectionTitleFirst]}>Ajustes</Text>
+        <TouchableOpacity style={styles.cardRow} onPress={() => router.push('/settings')}>
+          <Text style={styles.cardRowLabel}>Configuración (bankroll)</Text>
           <Text style={styles.chevron}>›</Text>
         </TouchableOpacity>
-        <AuthButton
-          title="Iniciar sesión"
-          onPress={() => router.push('/(auth)/login')}
-        />
-        <AuthButton
-          title="Crear cuenta"
-          onPress={() => router.push('/(auth)/register')}
-          variant="secondary"
-        />
+
+        <Text style={styles.sectionTitle}>Sesión</Text>
+        <View style={styles.sessionButtons}>
+          <AuthButton title="Iniciar sesión" onPress={() => router.push('/(auth)/login')} />
+          <AuthButton title="Crear cuenta" onPress={() => router.push('/(auth)/register')} variant="secondary" />
+        </View>
       </ScrollView>
     </View>
   );
@@ -148,10 +131,32 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: COLORS.surface,
     paddingTop: 60,
-    paddingBottom: 16,
+    paddingBottom: 20,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
+  },
+  badgeRow: {
+    marginBottom: 8,
+  },
+  sessionBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: COLORS.primary + '20',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 6,
+  },
+  sessionBadgeDot: {
+    fontSize: 8,
+    color: COLORS.primary,
+  },
+  sessionBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.primary,
   },
   headerTitle: {
     fontSize: 24,
@@ -167,35 +172,40 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: 24,
+    padding: 16,
+    paddingBottom: 40,
+  },
+  sectionTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.textMuted,
+    marginTop: 20,
+    marginBottom: 10,
+    marginLeft: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  sectionTitleFirst: {
+    marginTop: 0,
+  },
+  dangerSectionTitle: {
+    marginTop: 28,
+    color: COLORS.danger + 'cc',
+  },
+  sessionButtons: {
     gap: 16,
   },
-  section: {
-    marginBottom: 24,
-  },
-  label: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: COLORS.textMuted,
-    marginBottom: 4,
-    textTransform: 'uppercase',
-  },
-  value: {
-    fontSize: 16,
-    color: COLORS.textPrimary,
-  },
-  settingsRow: {
+  cardRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: COLORS.surface,
     padding: 16,
-    borderRadius: 10,
-    marginBottom: 16,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-  settingsRowLabel: {
+  cardRowLabel: {
     fontSize: 16,
     color: COLORS.textPrimary,
     fontWeight: '500',
@@ -206,22 +216,21 @@ const styles = StyleSheet.create({
     fontWeight: '300',
   },
   dangerRow: {
-    marginTop: 24,
     padding: 16,
     alignItems: 'center',
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: COLORS.danger + '60',
   },
-  dangerText: {
+  dangerRowText: {
     fontSize: 14,
     color: COLORS.danger,
     fontWeight: '600',
   },
-  content: {
-    flex: 1,
-    padding: 24,
-    justifyContent: 'center',
+  placeholderBlock: {
+    marginTop: 24,
+    padding: 20,
+    alignItems: 'center',
   },
   placeholderText: {
     fontSize: 16,

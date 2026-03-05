@@ -6,9 +6,20 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
+import { setUserBankroll } from './userSettingsService';
 import { fetchBettingSettings, updateBettingBankroll } from './api/matchService';
 
 const BETS_KEY = '@tennis_bets';
+const CACHE_TTL_MS = 30_000;
+let betsCache: { userId: string; data: Bet[]; ts: number } | null = null;
+
+export function invalidateBetsCache(userId?: string | null): void {
+  if (!userId) {
+    betsCache = null;
+    return;
+  }
+  if (betsCache?.userId === userId) betsCache = null;
+}
 
 export type BetStatus = 'activa' | 'cancelada' | 'completada';
 
@@ -94,14 +105,18 @@ function normalizeBet(b: Partial<Bet> & { id: string; matchId: number; stakeEur:
   };
 }
 
-/** Listar apuestas del usuario (Supabase si hay userId, sino AsyncStorage). Solo activas por defecto. */
+/** Listar apuestas del usuario (Supabase si hay userId, sino AsyncStorage). Caché 30s si no forceRefresh. */
 export async function getBets(
   userId?: string | null,
-  options?: { activeOnly?: boolean }
+  options?: { activeOnly?: boolean; forceRefresh?: boolean }
 ): Promise<Bet[]> {
   const activeOnly = options?.activeOnly !== false;
+  const forceRefresh = options?.forceRefresh === true;
 
   if (userId && isSupabaseConfigured) {
+    if (!forceRefresh && betsCache?.userId === userId && Date.now() - betsCache.ts < CACHE_TTL_MS) {
+      return activeOnly ? betsCache.data.filter((b) => b.status === 'activa' || !b.status) : betsCache.data;
+    }
     const selectCols = 'id, match_id, stake_eur, player1_name, player2_name, tournament, created_at, bookmaker, odds, picked_player, potential_win, status';
     let query = supabase
       .from('bets')
@@ -115,9 +130,11 @@ export async function getBets(
     const { data, error } = await query;
     if (error) {
       console.error('[Bets] Error Supabase getBets:', error.message);
-      return [];
+      return betsCache?.userId === userId ? (activeOnly ? betsCache.data.filter((b) => b.status === 'activa' || !b.status) : betsCache.data) : [];
     }
-    return (data ?? []).map(mapSupabaseToBet);
+    const list = (data ?? []).map(mapSupabaseToBet);
+    betsCache = { userId, data: list, ts: Date.now() };
+    return activeOnly ? list.filter((b) => b.status === 'activa' || !b.status) : list;
   }
 
   try {
@@ -168,6 +185,13 @@ export async function addBet(
     }
     const newBankroll = bankroll - stakeEur;
     await updateBettingBankroll(newBankroll);
+    if (userId) {
+      try {
+        await setUserBankroll(userId, newBankroll);
+      } catch (e) {
+        console.warn('[Bets] No se pudo actualizar bankroll en Supabase:', e);
+      }
+    }
   } catch (e: any) {
     const msg = e.response?.data?.detail ?? e.message ?? 'No se pudo actualizar el bankroll';
     return { success: false, error: msg };
@@ -205,6 +229,7 @@ export async function addBet(
       console.error('[Bets] Error Supabase addBet:', error.message);
       return { success: false, error: error.message, bankrollAfter: undefined };
     }
+    invalidateBetsCache(userId);
     return { success: true, bankrollAfter: await fetchBettingSettings().then((r) => r.bankroll) };
   }
 
@@ -230,11 +255,20 @@ export async function addBet(
 export async function removeBet(
   bet: Bet,
   userId?: string | null
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; bankrollAfter?: number; error?: string }> {
+  let newBankroll: number | undefined;
   try {
     const settings = await fetchBettingSettings();
     const bankroll = settings.bankroll ?? 0;
-    await updateBettingBankroll(bankroll + bet.stakeEur);
+    newBankroll = bankroll + bet.stakeEur;
+    await updateBettingBankroll(newBankroll);
+    if (userId) {
+      try {
+        await setUserBankroll(userId, newBankroll);
+      } catch (e) {
+        console.warn('[Bets] No se pudo actualizar bankroll en Supabase al cancelar:', e);
+      }
+    }
   } catch (e: any) {
     const msg = e.response?.data?.detail ?? e.message ?? 'No se pudo devolver el stake al bankroll';
     return { success: false, error: msg };
@@ -246,14 +280,15 @@ export async function removeBet(
       console.error('[Bets] Error Supabase removeBet:', error.message);
       return { success: false, error: error.message };
     }
-    return { success: true };
+    invalidateBetsCache(userId);
+    return { success: true, bankrollAfter: newBankroll };
   }
 
   try {
     const list = await getBets();
     const filtered = list.filter((b) => b.id !== bet.id);
     await AsyncStorage.setItem(BETS_KEY, JSON.stringify(filtered));
-    return { success: true };
+    return { success: true, bankrollAfter: newBankroll };
   } catch (e) {
     console.error('[Bets] Error AsyncStorage removeBet:', e);
     return { success: false, error: 'No se pudo borrar la apuesta' };
@@ -274,6 +309,7 @@ export async function deleteBetWithoutRefund(
       console.error('[Bets] Error Supabase deleteBetWithoutRefund:', error.message);
       return { success: false, error: error.message };
     }
+    invalidateBetsCache(userId);
     return { success: true };
   }
   try {

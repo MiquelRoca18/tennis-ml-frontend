@@ -1,12 +1,22 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import React, { useEffect } from 'react';
+import { useAuth } from '../../src/contexts/AuthContext';
 import { FavoritesProvider } from '../../src/contexts/FavoritesContext';
 import { FavoritesRefreshProvider, useFavoritesRefresh } from '../../src/contexts/FavoritesRefreshContext';
 import { useFavorites } from '../../src/hooks/useFavorites';
 import { COLORS } from '../../src/utils/constants';
 
+/** Etiqueta corta para el tab Cuenta cuando hay sesión (ej. "miquel" o "miquel…") */
+function getAccountTabLabel(email: string | undefined): string {
+  if (!email?.trim()) return 'Cuenta';
+  const part = email.split('@')[0]?.trim() || '';
+  if (part.length <= 10) return part;
+  return part.slice(0, 8) + '…';
+}
+
 function TabsWithBadge() {
+  const { user } = useAuth();
   const { favorites, refresh } = useFavorites();
   const { refreshTrigger } = useFavoritesRefresh();
   const favoritesCount = favorites?.length ?? 0;
@@ -71,7 +81,7 @@ function TabsWithBadge() {
       <Tabs.Screen
         name="account"
         options={{
-          title: 'Cuenta',
+          title: getAccountTabLabel(user?.email ?? undefined),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person" size={size} color={color} />
           ),

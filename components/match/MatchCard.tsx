@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import React from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import FavoriteButton from '../ui/FavoriteButton';
-import { useIsFavorite } from '../../src/hooks/useFavorites';
+import { FAVORITE_REQUIRES_LOGIN, useIsFavorite } from '../../src/hooks/useFavorites';
 import { fetchPlayerLookup } from '../../src/services/api/playerService';
 import { Match } from '../../src/types/api';
 import { COLORS, EV_THRESHOLD_BET, EV_THRESHOLD_MARGINAL } from '../../src/utils/constants';
@@ -98,13 +98,17 @@ export default function MatchCard({ match, onPress, onFavoriteRemoved }: MatchCa
     };
 
     const handleFavoritePress = async () => {
-        const newStatus = await toggle({
+        const result = await toggle({
             player1Name: jugador1.nombre,
             player2Name: jugador2.nombre,
             tournament: match.torneo ?? '',
             eventKey: match.event_key,
         });
-        if (!newStatus) onFavoriteRemoved?.();
+        if (result === FAVORITE_REQUIRES_LOGIN) {
+            router.replace('/(auth)/login');
+            return;
+        }
+        if (!result) onFavoriteRemoved?.();
     };
 
     const handlePlayerPress = async (playerKey: string | null | undefined, playerName: string, event: any) => {

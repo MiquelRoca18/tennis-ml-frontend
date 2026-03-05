@@ -8,6 +8,18 @@ import { isSupabaseConfigured, supabase } from '../lib/supabase';
 
 const FAVORITES_KEY = '@tennis_favorites';
 
+/** Caché en memoria para favoritos de Supabase (evita llamadas repetidas al cambiar de pestaña). */
+const CACHE_TTL_MS = 30_000; // 30 segundos
+let favoritesCache: { userId: string; data: Favorite[]; ts: number } | null = null;
+
+export function invalidateFavoritesCache(userId?: string | null): void {
+  if (!userId) {
+    favoritesCache = null;
+    return;
+  }
+  if (favoritesCache?.userId === userId) favoritesCache = null;
+}
+
 export interface Favorite {
   matchId: number;
   player1Name: string;
@@ -34,20 +46,59 @@ function mapSupabaseToFavorite(row: {
   };
 }
 
-/** Obtener favoritos (Supabase si hay userId, sino AsyncStorage) */
-export async function getFavorites(userId?: string | null): Promise<Favorite[]> {
-  if (userId && isSupabaseConfigured) {
-    const { data, error } = await supabase
-      .from('favorites')
-      .select('match_id, player1_name, player2_name, tournament, added_at')
-      .eq('user_id', userId)
-      .order('added_at', { ascending: false });
+/** Sanitiza mensaje de error (evitar loguear HTML de 502, etc.) */
+function sanitizeSupabaseError(message: string | undefined, code: string | undefined): string {
+  if (!message) return code ? `Error ${code}` : 'Error de servidor';
+  if (message.length > 200 || message.includes('<!DOCTYPE') || message.includes('502')) {
+    return 'Servidor temporalmente no disponible (502). Inténtalo en unos segundos.';
+  }
+  return message;
+}
 
-    if (error) {
-      console.error('[Favorites] Error Supabase getFavorites:', error.message, 'code:', error.code);
-      return [];
+/** Obtener favoritos (Supabase si hay userId, sino AsyncStorage). Reintenta una vez si hay 502. Usa caché 30s si forceRefresh no es true. */
+export async function getFavorites(
+  userId?: string | null,
+  options?: { forceRefresh?: boolean }
+): Promise<Favorite[]> {
+  const forceRefresh = options?.forceRefresh === true;
+
+  if (userId && isSupabaseConfigured) {
+    if (!forceRefresh && favoritesCache?.userId === userId && Date.now() - favoritesCache.ts < CACHE_TTL_MS) {
+      return favoritesCache.data;
     }
-    return (data ?? []).map(mapSupabaseToFavorite);
+    const attempt = async (): Promise<Favorite[]> => {
+      const { data, error } = await supabase
+        .from('favorites')
+        .select('match_id, player1_name, player2_name, tournament, added_at')
+        .eq('user_id', userId)
+        .order('added_at', { ascending: false });
+      if (error) throw error;
+      return (data ?? []).map(mapSupabaseToFavorite);
+    };
+    try {
+      const data = await attempt();
+      favoritesCache = { userId, data, ts: Date.now() };
+      return data;
+    } catch (e: any) {
+      const isServerError =
+        e?.message?.includes('502') ||
+        e?.message?.includes('Bad gateway') ||
+        e?.code === 'ECONNABORTED' ||
+        (e?.message?.length > 200 && e?.message?.includes('<!'));
+      if (isServerError) {
+        await new Promise((r) => setTimeout(r, 1500));
+        try {
+          const data = await attempt();
+          favoritesCache = { userId, data, ts: Date.now() };
+          return data;
+        } catch (retryErr: any) {
+          console.warn('[Favorites] getFavorites (retry):', sanitizeSupabaseError(retryErr?.message, retryErr?.code));
+          return favoritesCache?.userId === userId ? favoritesCache.data : [];
+        }
+      }
+      console.warn('[Favorites] getFavorites:', sanitizeSupabaseError(e?.message, e?.code));
+      return favoritesCache?.userId === userId ? favoritesCache.data : [];
+    }
   }
 
   try {
@@ -66,7 +117,7 @@ export async function isFavorite(matchId: number, userId?: string | null): Promi
   return favorites.some((fav) => fav.matchId === matchId);
 }
 
-/** Añadir favorito */
+/** Añadir favorito. Sin usuario no guardamos en local (requiere iniciar sesión). */
 export async function addFavorite(
   favorite: FavoriteInput,
   userId?: string | null,
@@ -85,9 +136,14 @@ export async function addFavorite(
     if (error) {
       if (error.code === '23505') return;
       console.error('[Favorites] Error Supabase addFavorite:', error.message, 'code:', error.code);
+    } else {
+      invalidateFavoritesCache(userId);
     }
     return;
   }
+
+  // Sin sesión: no guardar en AsyncStorage; el usuario debe iniciar sesión para tener favoritos
+  if (!userId && isSupabaseConfigured) return;
 
   try {
     const favorites = await getFavorites();
@@ -97,6 +153,15 @@ export async function addFavorite(
     await AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
   } catch (error) {
     console.error('[Favorites] Error AsyncStorage addFavorite:', error);
+  }
+}
+
+/** Limpiar favoritos locales (al iniciar sesión para mostrar solo los de la cuenta). */
+export async function clearLocalFavorites(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(FAVORITES_KEY);
+  } catch (error) {
+    console.error('[Favorites] Error clearLocalFavorites:', error);
   }
 }
 
@@ -111,12 +176,14 @@ export async function removeFavorite(matchId: number, userId?: string | null): P
 
     if (error) {
       console.error('[Favorites] Error Supabase removeFavorite:', error.message, 'code:', error.code);
+    } else {
+      invalidateFavoritesCache(userId);
     }
     return;
   }
 
   try {
-    const favorites = await getFavorites();
+    const favorites = await getFavorites(undefined);
     const filtered = favorites.filter((fav) => fav.matchId !== matchId);
     await AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(filtered));
   } catch (error) {

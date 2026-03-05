@@ -4,33 +4,72 @@ import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, To
 import AuthButton from '../../components/auth/AuthButton';
 import AuthInput from '../../components/auth/AuthInput';
 import { useAuth } from '../../src/contexts/AuthContext';
+import { validateEmail } from '../../src/utils/authValidation';
 import { COLORS } from '../../src/utils/constants';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { signIn, isConfigured } = useAuth();
+  const { signIn, signOut, isConfigured, user, lastSignOutAt } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const AUTH_TIMEOUT_MS = 25_000;
+  const RECENT_SIGNOUT_MS = 4000;
+  const DELAY_AFTER_RECENT_SIGNOUT_MS = 900;
+
   const handleLogin = async () => {
     setError(null);
-    if (!email.trim() || !password) {
-      setError('Introduce email y contraseña');
+    const emailCheck = validateEmail(email);
+    if (!emailCheck.valid) {
+      setError(emailCheck.message ?? 'Correo no válido.');
+      return;
+    }
+    if (!password) {
+      setError('Introduce tu contraseña.');
       return;
     }
 
     setLoading(true);
-    const { error: authError } = await signIn(email.trim(), password);
-    setLoading(false);
-
-    if (authError) {
-      setError(authError.message === 'Invalid login credentials' ? 'Email o contraseña incorrectos' : authError.message);
-      return;
+    try {
+      if (__DEV__) console.log('[Login] handleLogin: user?', !!user, '-> signOut si aplica');
+      if (user) {
+        await signOut();
+        if (__DEV__) console.log('[Login] handleLogin: signOut terminado');
+      }
+      if (lastSignOutAt && Date.now() - lastSignOutAt < RECENT_SIGNOUT_MS) {
+        if (__DEV__) console.log('[Login] handleLogin: delay post-signOut...');
+        await new Promise((r) => setTimeout(r, DELAY_AFTER_RECENT_SIGNOUT_MS));
+      }
+      if (__DEV__) console.log('[Login] handleLogin: llamando signIn (race 25s)...');
+      const result = await Promise.race([
+        signIn(email.trim(), password),
+        new Promise<{ error: Error | null }>((_, reject) =>
+          setTimeout(() => reject(new Error('timeout')), AUTH_TIMEOUT_MS)
+        ),
+      ]);
+      if (__DEV__) console.log('[Login] handleLogin: signIn devolvió. result.error?', !!result?.error);
+      const authError = result.error;
+      if (authError) {
+        const msg = authError.message;
+        if (msg === 'Invalid login credentials') setError('Email o contraseña incorrectos');
+        else if (/security purposes|only request this after|seconds/i.test(msg)) setError('Demasiados intentos. Espera unos segundos e inténtalo de nuevo.');
+        else setError(msg);
+        return;
+      }
+      router.replace('/(tabs)');
+    } catch (e: any) {
+      if (__DEV__) console.log('[Login] handleLogin: catch', e?.message);
+      if (e?.message === 'timeout') {
+        setError('El servidor no respondió. Comprueba tu conexión e inténtalo de nuevo.');
+      } else {
+        setError(e?.message ?? 'Error de conexión. Inténtalo de nuevo.');
+      }
+    } finally {
+      if (__DEV__) console.log('[Login] handleLogin: finally');
+      setLoading(false);
     }
-
-    router.replace('/(tabs)');
   };
 
   if (!isConfigured) {
@@ -53,6 +92,10 @@ export default function LoginScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
+        <TouchableOpacity style={styles.backButton} onPress={() => router.replace('/(tabs)')}>
+          <Text style={styles.backText}>← Volver</Text>
+        </TouchableOpacity>
+
         <Text style={styles.title}>🎾 Tennis ML</Text>
         <Text style={styles.subtitle}>Inicia sesión para sincronizar tus favoritos</Text>
 
@@ -105,8 +148,17 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 24,
-    paddingTop: 80,
+    paddingTop: 60,
     paddingBottom: 40,
+  },
+  backButton: {
+    alignSelf: 'flex-start',
+    marginBottom: 24,
+  },
+  backText: {
+    fontSize: 16,
+    color: COLORS.primary,
+    fontWeight: '600',
   },
   title: {
     fontSize: 32,
@@ -151,5 +203,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: COLORS.primary,
     fontWeight: '600',
+  },
+  devLink: {
+    marginTop: 16,
+    alignSelf: 'center',
+  },
+  devLinkText: {
+    fontSize: 13,
+    color: COLORS.textMuted,
   },
 });

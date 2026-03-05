@@ -42,6 +42,8 @@ export interface RegisterBetModalProps {
   onClose: () => void;
   /** Tras registrar con éxito (refrescar bankroll, etc.) */
   onSuccess?: () => void;
+  /** Llamado con el nuevo bankroll tras registrar la apuesta (para actualizar contexto y que Configuración lo muestre). */
+  onBankrollUpdated?: (newBankroll: number) => void;
   matchId: number;
   player1Name: string;
   player2Name: string;
@@ -56,6 +58,7 @@ export default function RegisterBetModal({
   visible,
   onClose,
   onSuccess,
+  onBankrollUpdated,
   matchId,
   player1Name,
   player2Name,
@@ -188,6 +191,9 @@ export default function RegisterBetModal({
                 Alert.alert('Error', result.error ?? 'No se pudo registrar la apuesta');
                 return;
               }
+              if (result.bankrollAfter != null) {
+                onBankrollUpdated?.(result.bankrollAfter);
+              }
               onSuccess?.();
               onClose();
               Alert.alert(
@@ -218,6 +224,7 @@ export default function RegisterBetModal({
     potentialWin,
     user?.id,
     onSuccess,
+    onBankrollUpdated,
     onClose,
   ]);
 

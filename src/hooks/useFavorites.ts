@@ -2,8 +2,10 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Favorite } from '../services/favoritesService';
 import { getFavorites, isFavorite, toggleFavorite } from '../services/favoritesService';
 import { useAuth } from '../contexts/AuthContext';
-import { useFavoritesContext } from '../contexts/FavoritesContext';
+import { FAVORITE_REQUIRES_LOGIN, useFavoritesContext } from '../contexts/FavoritesContext';
 import { useFavoritesRefresh } from '../contexts/FavoritesRefreshContext';
+
+export { FAVORITE_REQUIRES_LOGIN };
 
 /**
  * Hook para gestionar la lista de favoritos.
@@ -77,22 +79,22 @@ export function useIsFavorite(matchId: number | null) {
       player2Name: string;
       tournament: string;
       eventKey?: string;
-    }): Promise<boolean> => {
+    }): Promise<boolean | typeof FAVORITE_REQUIRES_LOGIN> => {
       if (!matchId) return false;
       if (ctx) {
-        const newStatus = await ctx.toggle(matchId, matchData);
-        return newStatus;
+        return ctx.toggle(matchId, matchData);
       }
+      if (!user) return FAVORITE_REQUIRES_LOGIN;
       const newStatus = await toggleFavorite(
         matchId,
         matchData,
-        user?.id,
+        user.id,
         matchData.eventKey
       );
       setFavorited(newStatus);
       return newStatus;
     },
-    [matchId, ctx, user?.id]
+    [matchId, ctx, user]
   );
 
   if (ctx) {

@@ -8,8 +8,11 @@
  * - Value bet indicator
  */
 
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useAuth } from '../../../../../src/contexts/AuthContext';
+import { useBankroll } from '../../../../../src/contexts/BankrollContext';
 import { MatchFullResponse, getShortName } from '../../../../../src/types/matchDetail';
 import { COLORS } from '../../../../../src/utils/constants';
 import RegisterBetModal from '../../../RegisterBetModal';
@@ -22,6 +25,9 @@ interface PredictionTabV2Props {
 }
 
 export default function PredictionTabV2({ data, scrollable = true, onBetPlaced }: PredictionTabV2Props) {
+    const router = useRouter();
+    const { user } = useAuth();
+    const { saveBankroll } = useBankroll();
     const [showRegisterBetModal, setShowRegisterBetModal] = useState(false);
     const { prediction, player1, player2, odds, match: matchInfo } = data;
 
@@ -54,6 +60,10 @@ export default function PredictionTabV2({ data, scrollable = true, onBetPlaced }
 
     const openRegisterBetModal = () => {
         if (!hasStake || stakeEur <= 0 || !matchInfo?.id) return;
+        if (!user) {
+            router.replace('/(auth)/login');
+            return;
+        }
         setShowRegisterBetModal(true);
     };
 
@@ -147,6 +157,7 @@ export default function PredictionTabV2({ data, scrollable = true, onBetPlaced }
                 visible={showRegisterBetModal}
                 onClose={() => setShowRegisterBetModal(false)}
                 onSuccess={onBetPlaced}
+                onBankrollUpdated={saveBankroll}
                 matchId={matchInfo!.id}
                 player1Name={player1.name}
                 player2Name={player2.name}

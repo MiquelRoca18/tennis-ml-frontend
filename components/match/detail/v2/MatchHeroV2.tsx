@@ -16,7 +16,7 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import FavoriteButton from '../../../ui/FavoriteButton';
-import { useIsFavorite } from '../../../../src/hooks/useFavorites';
+import { FAVORITE_REQUIRES_LOGIN, useIsFavorite } from '../../../../src/hooks/useFavorites';
 import { fetchPlayerLookup } from '../../../../src/services/api/playerService';
 import { MatchFullResponse, getShortName } from '../../../../src/types/matchDetail';
 import { COLORS } from '../../../../src/utils/constants';
@@ -106,13 +106,16 @@ export default function MatchHeroV2({ data }: MatchHeroV2Props) {
                     <Text style={styles.tournamentName}>{match.tournament}</Text>
                     <FavoriteButton
                         isFavorite={favorited}
-                        onPress={() =>
-                            toggle({
+                        onPress={async () => {
+                            const result = await toggle({
                                 player1Name: player1.name,
                                 player2Name: player2.name,
                                 tournament: match.tournament ?? '',
-                            })
-                        }
+                            });
+                            if (result === FAVORITE_REQUIRES_LOGIN) {
+                                router.replace('/(auth)/login');
+                            }
+                        }}
                         size={28}
                     />
                 </View>

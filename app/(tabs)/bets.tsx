@@ -14,7 +14,8 @@ import {
   View,
 } from 'react-native';
 import { useAuth } from '../../src/contexts/AuthContext';
-import { getBets, removeBet, deleteBetWithoutRefund } from '../../src/services/betsService';
+import { useBankroll } from '../../src/contexts/BankrollContext';
+import { getBets, invalidateBetsCache, removeBet, deleteBetWithoutRefund } from '../../src/services/betsService';
 import type { Bet } from '../../src/services/betsService';
 import { fetchMatchesStatusBatch, fetchRefreshResultsBatch } from '../../src/services/api/matchService';
 import { getShortName } from '../../src/types/matchDetail';
@@ -65,6 +66,7 @@ function isSamePlayer(winnerName: string, pickedPlayer: string): boolean {
 export default function BetsScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { bankroll: contextBankroll, saveBankroll } = useBankroll();
   const [bets, setBets] = useState<Bet[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -89,6 +91,7 @@ export default function BetsScreen() {
               const result = await removeBet(bet, user?.id);
               setDeletingId(null);
               if (result.success) {
+                if (user && result.bankrollAfter != null) saveBankroll(result.bankrollAfter);
                 setBets((prev) => prev.filter((b) => b.id !== bet.id));
                 Alert.alert('Listo', `${bet.stakeEur.toFixed(2)}€ devueltos al bankroll.`);
               } else {
@@ -99,12 +102,12 @@ export default function BetsScreen() {
         ]
       );
     },
-    [user?.id]
+    [user?.id, saveBankroll]
   );
 
-  const loadBets = useCallback(async () => {
+  const loadBets = useCallback(async (forceRefresh = false) => {
     try {
-      const list = await getBets(user?.id);
+      const list = await getBets(user?.id, { forceRefresh });
       setBets(list);
 
       // Liquidar apuestas de partidos ya completados
@@ -146,8 +149,12 @@ export default function BetsScreen() {
       }
       if (totalWinnings > 0) {
         try {
-          const { bankroll = 0 } = await fetchBettingSettings();
-          await updateBettingBankroll(bankroll + totalWinnings);
+          const currentBankroll = user && contextBankroll != null
+            ? contextBankroll
+            : (await fetchBettingSettings()).bankroll ?? 0;
+          const newBankroll = currentBankroll + totalWinnings;
+          await updateBettingBankroll(newBankroll);
+          if (user) await saveBankroll(newBankroll);
         } catch (e) {
           console.warn('[Bets] No se pudo actualizar bankroll tras liquidar:', e);
         }
@@ -156,7 +163,8 @@ export default function BetsScreen() {
         await deleteBetWithoutRefund(bet, user?.id);
       }
       if (toDelete.length > 0) {
-        const updated = await getBets(user?.id);
+        invalidateBetsCache(user?.id);
+        const updated = await getBets(user?.id, { forceRefresh: true });
         setBets(updated);
       }
     } catch {
@@ -165,7 +173,7 @@ export default function BetsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [user?.id]);
+  }, [user?.id, contextBankroll, saveBankroll]);
 
   useFocusEffect(
     useCallback(() => {
@@ -190,7 +198,7 @@ export default function BetsScreen() {
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    loadBets();
+    loadBets(true);
   }, [loadBets]);
 
   return (

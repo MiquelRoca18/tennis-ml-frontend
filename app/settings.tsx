@@ -1,10 +1,9 @@
+import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,16 +11,21 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { COLORS } from '../src/utils/constants';
+import { useAuth } from '../src/contexts/AuthContext';
+import { useBankroll } from '../src/contexts/BankrollContext';
 import { fetchBettingSettings, updateBettingBankroll } from '../src/services/api/matchService';
+import { COLORS } from '../src/utils/constants';
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const { user } = useAuth();
+  const { bankroll: contextBankroll, loading: bankrollContextLoading, saveBankroll, refreshBankroll } = useBankroll();
   const [bankroll, setBankroll] = useState<string>('');
   const [bankrollLoading, setBankrollLoading] = useState(true);
   const [bankrollSaving, setBankrollSaving] = useState(false);
 
   const loadBettingSettings = useCallback(async () => {
+    if (user) return;
     try {
       setBankrollLoading(true);
       const res = await fetchBettingSettings();
@@ -31,11 +35,25 @@ export default function SettingsScreen() {
     } finally {
       setBankrollLoading(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
-    loadBettingSettings();
-  }, [loadBettingSettings]);
+    if (user && !bankrollContextLoading) {
+      setBankroll(contextBankroll != null ? String(contextBankroll) : '1000');
+    }
+  }, [user, contextBankroll, bankrollContextLoading]);
+
+  useEffect(() => {
+    if (!user) loadBettingSettings();
+  }, [user, loadBettingSettings]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (user) void refreshBankroll();
+    }, [user, refreshBankroll])
+  );
+
+  const showBankrollLoading = user ? bankrollContextLoading : bankrollLoading;
 
   const handleSaveBankroll = async () => {
     const value = parseFloat(bankroll.replace(',', '.'));
@@ -45,9 +63,15 @@ export default function SettingsScreen() {
     }
     try {
       setBankrollSaving(true);
-      await updateBettingBankroll(value);
-      setBankroll(String(value));
-      Alert.alert('Guardado', 'El bankroll se ha actualizado. Las cantidades sugeridas por partido se recalcularán con este valor.');
+      if (user) {
+        await saveBankroll(value);
+        setBankroll(String(value));
+        Alert.alert('Guardado', 'Bankroll actualizado. Las cantidades sugeridas se recalcularán con este valor.');
+      } else {
+        await updateBettingBankroll(value);
+        setBankroll(String(value));
+        Alert.alert('Guardado', 'Bankroll actualizado. Inicia sesión para que quede guardado en tu cuenta.');
+      }
     } catch (e: any) {
       Alert.alert('Error', e.message || 'No se pudo guardar el bankroll.');
     } finally {
@@ -59,63 +83,57 @@ export default function SettingsScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backText}>← Volver</Text>
+          <Text style={styles.backText}>← Cuenta</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Configuración</Text>
+        <Text style={styles.headerSubtitle}>Bankroll y preferencias</Text>
       </View>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Apuestas</Text>
-          <View style={styles.card}>
-            <Text style={styles.bankrollLabel}>Bankroll (€)</Text>
-            <Text style={styles.bankrollHint}>
-              Cantidad de dinero que usamos para calcular el stake sugerido por partido (Kelly). Al registrar una apuesta, el bankroll se resta automáticamente. Cuando ganes (o pierdas), actualiza aquí el bankroll con tu nuevo total.
-            </Text>
-            {bankrollLoading ? (
-              <ActivityIndicator size="small" color={COLORS.primary} style={styles.loader} />
-            ) : (
-              <>
-                <TextInput
-                  style={styles.input}
-                  value={bankroll}
-                  onChangeText={setBankroll}
-                  keyboardType="decimal-pad"
-                  placeholder="Ej: 1000"
-                  placeholderTextColor={COLORS.textMuted}
-                  editable={!bankrollSaving}
-                />
-                <TouchableOpacity
-                  style={[styles.saveButton, bankrollSaving && styles.saveButtonDisabled]}
-                  onPress={handleSaveBankroll}
-                  disabled={bankrollSaving}
-                >
-                  {bankrollSaving ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <Text style={styles.saveButtonText}>Guardar bankroll</Text>
-                  )}
-                </TouchableOpacity>
-              </>
-            )}
-          </View>
+        <Text style={[styles.sectionTitle, styles.sectionTitleFirst]}>Apuestas</Text>
+        <View style={styles.card}>
+          <Text style={styles.cardLabel}>Bankroll (€)</Text>
+          <Text style={styles.cardHint}>
+            Cantidad que usamos para el stake sugerido por partido. Al registrar una apuesta se resta; al ganar o perder, actualiza aquí el total.
+          </Text>
+          {showBankrollLoading ? (
+            <ActivityIndicator size="small" color={COLORS.primary} style={styles.loader} />
+          ) : (
+            <>
+              <TextInput
+                style={styles.input}
+                value={bankroll}
+                onChangeText={setBankroll}
+                keyboardType="decimal-pad"
+                placeholder="Ej: 1000"
+                placeholderTextColor={COLORS.textMuted}
+                editable={!bankrollSaving}
+              />
+              <TouchableOpacity
+                style={[styles.saveButton, bankrollSaving && styles.saveButtonDisabled]}
+                onPress={handleSaveBankroll}
+                disabled={bankrollSaving}
+              >
+                {bankrollSaving ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.saveButtonText}>Guardar bankroll</Text>
+                )}
+              </TouchableOpacity>
+            </>
+          )}
         </View>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>App</Text>
-          <View style={styles.row}>
-            <Text style={styles.rowLabel}>Versión</Text>
-            <Text style={styles.rowValue}>1.0.0</Text>
-          </View>
+
+        <Text style={styles.sectionTitle}>App</Text>
+        <View style={styles.row}>
+          <Text style={styles.rowLabel}>Versión</Text>
+          <Text style={styles.rowValue}>1.0.0</Text>
         </View>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Cuenta</Text>
-          <TouchableOpacity
-            style={styles.row}
-            onPress={() => router.replace('/(tabs)/account')}
-          >
-            <Text style={styles.rowLabel}>Gestionar cuenta</Text>
-            <Text style={styles.chevron}>›</Text>
-          </TouchableOpacity>
-        </View>
+
+        <Text style={styles.sectionTitle}>Cuenta</Text>
+        <TouchableOpacity style={styles.row} onPress={() => router.replace('/(tabs)/account')}>
+          <Text style={styles.rowLabel}>Volver a Cuenta</Text>
+          <Text style={styles.chevron}>›</Text>
+        </TouchableOpacity>
       </ScrollView>
     </View>
   );
@@ -146,6 +164,11 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: COLORS.textPrimary,
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
   },
   scrollView: {
     flex: 1,
@@ -154,16 +177,64 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 40,
   },
-  section: {
-    marginBottom: 24,
-  },
   sectionTitle: {
     fontSize: 12,
     fontWeight: '700',
     color: COLORS.textMuted,
-    marginBottom: 12,
+    marginTop: 20,
+    marginBottom: 10,
+    marginLeft: 4,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  sectionTitleFirst: {
+    marginTop: 0,
+  },
+  card: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  cardLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    marginBottom: 6,
+  },
+  cardHint: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    marginBottom: 14,
+    lineHeight: 18,
+  },
+  input: {
+    backgroundColor: COLORS.background,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 10,
+    padding: 14,
+    fontSize: 16,
+    color: COLORS.textPrimary,
+    marginBottom: 12,
+  },
+  saveButton: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  saveButtonDisabled: {
+    opacity: 0.7,
+  },
+  saveButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  loader: {
+    marginVertical: 16,
   },
   row: {
     flexDirection: 'row',
@@ -171,8 +242,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     backgroundColor: COLORS.surface,
     padding: 16,
-    borderRadius: 10,
-    marginBottom: 8,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: COLORS.border,
   },
@@ -189,51 +259,5 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: COLORS.textMuted,
     fontWeight: '300',
-  },
-  card: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 10,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  bankrollLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.textPrimary,
-    marginBottom: 8,
-  },
-  bankrollHint: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
-    marginBottom: 12,
-    lineHeight: 18,
-  },
-  input: {
-    backgroundColor: COLORS.background,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    color: COLORS.textPrimary,
-    marginBottom: 12,
-  },
-  saveButton: {
-    backgroundColor: COLORS.primary,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  saveButtonDisabled: {
-    opacity: 0.7,
-  },
-  saveButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  loader: {
-    marginVertical: 16,
   },
 });

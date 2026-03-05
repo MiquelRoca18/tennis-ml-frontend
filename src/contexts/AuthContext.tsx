@@ -1,16 +1,17 @@
 /**
  * AuthContext - Gestión de autenticación con Supabase
  */
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
-import { migrateLocalFavoritesToSupabase } from '../services/favoritesService';
+import { clearLocalFavorites } from '../services/favoritesService';
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
   isConfigured: boolean;
+  lastSignOutAt: number;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -20,13 +21,16 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const SIGN_OUT_SETTLE_MS = 600;
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [lastSignOutAt, setLastSignOutAt] = useState(0);
 
-  const hasMigratedRef = useRef<string | null>(null);
-
+  // Un solo listener de onAuthStateChange, en un efecto global. Limpieza al desmontar.
+  // Evitar múltiples instancias de Supabase y múltiples suscripciones (evita que el 2º login se cuelgue).
   useEffect(() => {
     if (!isSupabaseConfigured) {
       setLoading(false);
@@ -38,26 +42,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
-      if (session?.user?.id && hasMigratedRef.current !== session.user.id) {
-        hasMigratedRef.current = session.user.id;
-        await migrateLocalFavoritesToSupabase(session.user.id);
+      if (session?.user?.id) {
+        await clearLocalFavorites();
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (__DEV__) console.log('[Auth] onAuthStateChange', event, session?.user?.email ?? 'null');
       setSession(session);
       setUser(session?.user ?? null);
-
-      // Migrar favoritos locales a Supabase al hacer login (solo una vez por sesión)
-      if (session?.user?.id && hasMigratedRef.current !== session.user.id) {
-        hasMigratedRef.current = session.user.id;
-        await migrateLocalFavoritesToSupabase(session.user.id);
-      } else if (!session) {
-        hasMigratedRef.current = null;
+      if (session?.user?.id) {
+        void clearLocalFavorites();
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
@@ -66,9 +67,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { error: new Error('Supabase no configurado') };
     }
     if (__DEV__) console.log('[Auth] signIn intentando...', email);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (__DEV__ && error) console.error('[Auth] signIn error:', error.message);
-    return { error };
+    const SIGNIN_DEADLOCK_MS = 10_000;
+    const signInPromise = supabase.auth.signInWithPassword({ email, password });
+    const timeoutPromise = new Promise<{ error: Error }>((resolve) => {
+      if (__DEV__) console.log('[Auth] signIn: timeout programado en', SIGNIN_DEADLOCK_MS, 'ms');
+      setTimeout(() => {
+        if (__DEV__) console.log('[Auth] signIn: timeout disparado');
+        resolve({ error: new Error('signin_timeout') });
+      }, SIGNIN_DEADLOCK_MS);
+    });
+    if (__DEV__) console.log('[Auth] signIn: esperando Promise.race (signInWithPassword vs timeout)...');
+    const result = await Promise.race([signInPromise, timeoutPromise]);
+    if (__DEV__) console.log('[Auth] signIn: Promise.race resuelto. result.error?', !!result.error, result.error?.message ?? 'ok');
+    if (result.error) {
+      if (result.error.message === 'signin_timeout') {
+        if (__DEV__) console.log('[Auth] signIn: branch timeout, llamando getSession...');
+        const { data: { session } } = await supabase.auth.getSession();
+        if (__DEV__) console.log('[Auth] signIn: getSession devuelto. session?', !!session, session?.user?.email);
+        if (session?.user?.email?.toLowerCase() === email.toLowerCase()) {
+          if (__DEV__) console.log('[Auth] signIn OK (recuperado tras timeout)');
+          return { error: null };
+        }
+        if (__DEV__) console.warn('[Auth] signIn timeout sin sesión');
+        return { error: new Error('El servidor tardó demasiado. Inténtalo de nuevo.') };
+      }
+      if (__DEV__) console.error('[Auth] signIn error:', result.error.message);
+      return { error: result.error };
+    }
+    if (__DEV__) console.log('[Auth] signIn: retornando éxito');
+    return { error: null };
   }, []);
 
   const signUp = useCallback(async (email: string, password: string) => {
@@ -77,14 +104,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { error: new Error('Supabase no configurado') };
     }
     if (__DEV__) console.log('[Auth] signUp intentando...', email);
-    const { error } = await supabase.auth.signUp({ email, password });
-    if (__DEV__ && error) console.error('[Auth] signUp error:', error.message);
-    return { error };
+    const redirectTo = process.env.EXPO_PUBLIC_AUTH_REDIRECT_URL ?? 'tennismlfrontend://auth/callback';
+    const SIGNUP_DEADLOCK_MS = 10_000;
+    const signUpPromise = supabase.auth.signUp({ email, password, options: { emailRedirectTo: redirectTo } });
+    const timeoutPromise = new Promise<{ error: Error }>((resolve) => {
+      if (__DEV__) console.log('[Auth] signUp: timeout programado en', SIGNUP_DEADLOCK_MS, 'ms');
+      setTimeout(() => {
+        if (__DEV__) console.log('[Auth] signUp: timeout disparado');
+        resolve({ error: new Error('signup_timeout') });
+      }, SIGNUP_DEADLOCK_MS);
+    });
+    if (__DEV__) console.log('[Auth] signUp: esperando Promise.race...');
+    const result = await Promise.race([signUpPromise, timeoutPromise]);
+    if (__DEV__) console.log('[Auth] signUp: Promise.race resuelto. result.error?', !!result.error, result.error?.message ?? 'ok');
+    if (result.error) {
+      if (result.error.message === 'signup_timeout') {
+        if (__DEV__) console.log('[Auth] signUp: branch timeout, llamando getSession...');
+        const { data: { session } } = await supabase.auth.getSession();
+        if (__DEV__) console.log('[Auth] signUp: getSession devuelto. session?', !!session);
+        if (session?.user?.email?.toLowerCase() === email.toLowerCase()) {
+          if (__DEV__) console.log('[Auth] signUp OK (recuperado tras timeout)');
+          return { error: null };
+        }
+        if (__DEV__) console.warn('[Auth] signUp timeout sin sesión');
+        return { error: new Error('El servidor tardó demasiado. Inténtalo de nuevo.') };
+      }
+      if (__DEV__) console.error('[Auth] signUp error:', result.error.message);
+      return { error: result.error };
+    }
+    if (__DEV__) console.log('[Auth] signUp: retornando éxito');
+    return { error: null };
   }, []);
 
   const signOut = useCallback(async () => {
     if (__DEV__) console.log('[Auth] signOut...');
     await supabase.auth.signOut();
+    setSession(null);
+    setUser(null);
+    setLastSignOutAt(Date.now());
+    await new Promise((r) => setTimeout(r, SIGN_OUT_SETTLE_MS));
   }, []);
 
   const resetPassword = useCallback(async (email: string) => {
@@ -93,7 +151,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { error: new Error('Supabase no configurado') };
     }
     if (__DEV__) console.log('[Auth] resetPassword enviando email a...', email);
-    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    const redirectTo = process.env.EXPO_PUBLIC_AUTH_REDIRECT_URL ?? 'tennismlfrontend://auth/callback';
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
     if (__DEV__ && error) console.error('[Auth] resetPassword error:', error.message);
     return { error };
   }, []);
@@ -133,6 +192,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     session,
     loading,
     isConfigured: isSupabaseConfigured,
+    lastSignOutAt,
     signIn,
     signUp,
     signOut,

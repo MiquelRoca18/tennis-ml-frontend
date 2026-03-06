@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import TenlyLogo from '../../assets/images/tenly-logo.svg';
 import AuthButton from '../../components/auth/AuthButton';
 import AuthInput from '../../components/auth/AuthInput';
 import { useAuth } from '../../src/contexts/AuthContext';
@@ -81,7 +82,9 @@ export default function RegisterScreen() {
   if (!isConfigured) {
     return (
       <View style={styles.container}>
-        <Text style={styles.title}>🎾 Tenly</Text>
+        <View style={styles.logoWrap}>
+          <TenlyLogo width={220} height={77} />
+        </View>
         <Text style={styles.subtitle}>Configura Supabase para crear una cuenta</Text>
         <AuthButton title="Volver" onPress={() => router.replace('/(tabs)')} variant="secondary" />
       </View>
@@ -118,7 +121,9 @@ export default function RegisterScreen() {
         <TouchableOpacity style={styles.backButton} onPress={() => router.replace('/(tabs)')}>
           <Text style={styles.backText}>← Volver</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>🎾 Tenly</Text>
+        <View style={styles.logoWrap}>
+          <TenlyLogo width={220} height={77} />
+        </View>
         <Text style={styles.subtitle}>Crea una cuenta para guardar tus favoritos</Text>
 
         <View style={styles.form}>
@@ -211,6 +216,11 @@ const styles = StyleSheet.create({
   successButtonWrap: {
     alignSelf: 'stretch',
     width: '100%',
+  },
+  logoWrap: {
+    marginTop: 24,
+    marginBottom: 28,
+    alignItems: 'center',
   },
   title: {
     fontSize: 32,

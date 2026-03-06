@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import TenlyLogo from '../../assets/images/tenly-logo.svg';
 import AuthButton from '../../components/auth/AuthButton';
 import AuthInput from '../../components/auth/AuthInput';
 import { useAuth } from '../../src/contexts/AuthContext';
@@ -75,7 +76,9 @@ export default function LoginScreen() {
   if (!isConfigured) {
     return (
       <View style={styles.container}>
-        <Text style={styles.title}>🎾 Tenly</Text>
+        <View style={styles.logoWrap}>
+          <TenlyLogo width={220} height={77} />
+        </View>
         <Text style={styles.subtitle}>Configura Supabase para acceder a tu cuenta</Text>
         <AuthButton title="Volver" onPress={() => router.replace('/(tabs)')} variant="secondary" />
       </View>
@@ -96,7 +99,9 @@ export default function LoginScreen() {
           <Text style={styles.backText}>← Volver</Text>
         </TouchableOpacity>
 
-        <Text style={styles.title}>🎾 Tenly</Text>
+        <View style={styles.logoWrap}>
+          <TenlyLogo width={220} height={77} />
+        </View>
         <Text style={styles.subtitle}>Inicia sesión para sincronizar tus favoritos</Text>
 
         <View style={styles.form}>
@@ -159,6 +164,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.primary,
     fontWeight: '600',
+  },
+  logoWrap: {
+    marginTop: 24,
+    marginBottom: 28,
+    alignItems: 'center',
   },
   title: {
     fontSize: 32,

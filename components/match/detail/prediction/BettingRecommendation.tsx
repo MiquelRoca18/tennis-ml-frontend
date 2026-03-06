@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
     stakeSuggested: {
         fontSize: 15,
         fontWeight: '700',
-        color: COLORS.primary,
+        color: COLORS.success,
         marginBottom: 8,
         textAlign: 'center',
     },

@@ -19,7 +19,7 @@ import { getBets, invalidateBetsCache, removeBet, deleteBetWithoutRefund } from 
 import type { Bet } from '../../src/services/betsService';
 import { fetchMatchesStatusBatch, fetchRefreshResultsBatch } from '../../src/services/api/matchService';
 import { getShortName } from '../../src/types/matchDetail';
-import { fetchBettingSettings, updateBettingBankroll } from '../../src/services/api/matchService';
+import { getUserBankroll } from '../../src/services/userSettingsService';
 import { COLORS } from '../../src/utils/constants';
 
 function formatDate(createdAt: string): string {
@@ -147,14 +147,13 @@ export default function BetsScreen() {
         if (won && bet.odds >= 1) totalWinnings += bet.potentialWin;
         toDelete.push(bet);
       }
-      if (totalWinnings > 0) {
+      // Solo se pueden tener apuestas estando logueado; el bankroll está en Supabase.
+      if (totalWinnings > 0 && user) {
         try {
-          const currentBankroll = user && contextBankroll != null
-            ? contextBankroll
-            : (await fetchBettingSettings()).bankroll ?? 0;
+          // Ej: 100€ → apuesta 20€ a 2.00 → 80€ en Supabase; al ganar +40€ (stake×cuota) → 80+40=120€.
+          const currentBankroll = await getUserBankroll(user.id, { forceRefresh: true });
           const newBankroll = currentBankroll + totalWinnings;
-          await updateBettingBankroll(newBankroll);
-          if (user) await saveBankroll(newBankroll);
+          await saveBankroll(newBankroll);
         } catch (e) {
           console.warn('[Bets] No se pudo actualizar bankroll tras liquidar:', e);
         }

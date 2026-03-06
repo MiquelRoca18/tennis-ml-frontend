@@ -6,8 +6,9 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
-import { setUserBankroll } from './userSettingsService';
-import { fetchBettingSettings, updateBettingBankroll } from './api/matchService';
+import { getUserBankroll, setUserBankroll } from './userSettingsService';
+import { fetchBettingSettings, fetchMatchesStatusBatch, fetchRefreshResultsBatch, updateBettingBankroll } from './api/matchService';
+import { getShortName } from '../types/matchDetail';
 
 const BETS_KEY = '@tennis_bets';
 const CACHE_TTL_MS = 30_000;
@@ -320,5 +321,66 @@ export async function deleteBetWithoutRefund(
   } catch (e) {
     console.error('[Bets] Error AsyncStorage deleteBetWithoutRefund:', e);
     return { success: false, error: 'No se pudo eliminar la apuesta' };
+  }
+}
+
+function isSamePlayer(winnerName: string, pickedPlayer: string): boolean {
+  if (!winnerName?.trim() || !pickedPlayer?.trim()) return false;
+  const w = winnerName.trim().toLowerCase();
+  const p = pickedPlayer.trim().toLowerCase();
+  if (w === p) return true;
+  const wLast = getShortName(winnerName).toLowerCase();
+  const pLast = getShortName(pickedPlayer).toLowerCase();
+  return wLast === pLast || w.includes(p) || p.includes(w);
+}
+
+/**
+ * Liquida apuestas de partidos ya completados y actualiza el bankroll en Supabase.
+ * Pensado para ejecutarse al abrir la app o al volver al primer plano, así el bankroll
+ * está actualizado aunque el usuario no entre en "Mis apuestas".
+ */
+export async function liquidateSettledBets(userId: string): Promise<void> {
+  const list = await getBets(userId, { forceRefresh: true });
+  if (list.length === 0) return;
+  const matchIds = list.map((b) => b.matchId);
+  try {
+    await fetchRefreshResultsBatch(matchIds);
+  } catch (e) {
+    if (__DEV__) console.warn('[Bets] liquidateSettledBets refresh-results:', e);
+  }
+  let statusMap: Record<string, { status: string; winner: number | null }> = {};
+  try {
+    statusMap = await fetchMatchesStatusBatch(matchIds);
+  } catch (e) {
+    if (__DEV__) console.warn('[Bets] liquidateSettledBets status-batch:', e);
+    return;
+  }
+  let totalWinnings = 0;
+  const toDelete: Bet[] = [];
+  for (const bet of list) {
+    const info = statusMap[String(bet.matchId)];
+    if (!info || info.status !== 'completado' || info.winner == null) continue;
+    if (!bet.pickedPlayer?.trim()) continue;
+    const winnerName = info.winner === 1 ? bet.player1Name : bet.player2Name;
+    if (!winnerName) continue;
+    const won = isSamePlayer(winnerName, bet.pickedPlayer);
+    if (won && bet.odds >= 1) totalWinnings += bet.potentialWin;
+    toDelete.push(bet);
+  }
+  if (totalWinnings > 0) {
+    try {
+      const currentBankroll = await getUserBankroll(userId, { forceRefresh: true });
+      const newBankroll = currentBankroll + totalWinnings;
+      await setUserBankroll(userId, newBankroll);
+      await updateBettingBankroll(newBankroll);
+    } catch (e) {
+      if (__DEV__) console.warn('[Bets] liquidateSettledBets bankroll update:', e);
+    }
+  }
+  for (const bet of toDelete) {
+    await deleteBetWithoutRefund(bet, userId);
+  }
+  if (toDelete.length > 0) {
+    invalidateBetsCache(userId);
   }
 }

@@ -15,6 +15,7 @@ import 'react-native-reanimated';
 
 import { Colors } from '@/constants/Colors';
 import { ThemeProvider } from '@/contexts/ThemeContext';
+import LiquidationOnAppOpen from '@/components/LiquidationOnAppOpen';
 import { AuthProvider } from '@/src/contexts/AuthContext';
 import { BankrollProvider } from '@/src/contexts/BankrollContext';
 
@@ -60,7 +61,9 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <BankrollProvider>
-      <ThemeProvider>
+        <>
+          <LiquidationOnAppOpen />
+          <ThemeProvider>
         <NavigationThemeProvider value={CustomDarkTheme}>
           <Stack
             screenOptions={{
@@ -93,7 +96,8 @@ export default function RootLayout() {
           </Stack>
           <StatusBar style="light" />
         </NavigationThemeProvider>
-      </ThemeProvider>
+          </ThemeProvider>
+        </>
       </BankrollProvider>
     </AuthProvider>
   );

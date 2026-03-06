@@ -462,7 +462,7 @@ const styles = StyleSheet.create({
     stakeSuggested: {
         fontSize: 13,
         fontWeight: '700',
-        color: COLORS.primary,
+        color: COLORS.success,
     },
     warningBanner: {
         flexDirection: 'row',

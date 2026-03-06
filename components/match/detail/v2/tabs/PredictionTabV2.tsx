@@ -387,11 +387,11 @@ const styles = StyleSheet.create({
     stakeSuggestedBlock: {
         fontSize: 15,
         fontWeight: '600',
-        color: COLORS.textSecondary,
+        color: COLORS.success,
     },
     stakeValue: {
         fontWeight: '800',
-        color: COLORS.primary,
+        color: COLORS.success,
     },
 
     // Value Bet Card
@@ -434,7 +434,7 @@ const styles = StyleSheet.create({
     stakeSuggested: {
         fontSize: 15,
         fontWeight: '700',
-        color: COLORS.primary,
+        color: COLORS.success,
         marginTop: 8,
     },
     bankrollNote: {

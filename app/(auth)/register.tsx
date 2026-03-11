@@ -63,6 +63,7 @@ export default function RegisterScreen() {
       if (authError) {
         const msg = authError.message;
         if (/security purposes|only request this after|seconds/i.test(msg)) setError('Demasiados intentos. Espera unos 20–30 segundos e inténtalo de nuevo.');
+        else if (/confirmation email|sending.*email|error sending/i.test(msg)) setError('No se pudo enviar el correo de confirmación. Comprueba la configuración SMTP en Supabase o inténtalo más tarde.');
         else setError(msg);
         return;
       }

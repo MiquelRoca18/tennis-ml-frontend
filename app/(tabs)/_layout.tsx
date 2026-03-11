@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { FavoritesProvider } from '../../src/contexts/FavoritesContext';
 import { FavoritesRefreshProvider, useFavoritesRefresh } from '../../src/contexts/FavoritesRefreshContext';
@@ -20,10 +20,17 @@ function TabsWithBadge() {
   const { favorites, refresh } = useFavorites();
   const { refreshTrigger } = useFavoritesRefresh();
   const favoritesCount = favorites?.length ?? 0;
+  const refreshRef = useRef(refresh);
+  refreshRef.current = refresh;
+  const prevRefreshTrigger = useRef(refreshTrigger);
 
+  // Solo refrescar cuando refreshTrigger cambie (p. ej. al volver a Favoritos), no en montaje inicial.
+  // El montaje inicial ya carga favoritos en FavoritesContext.
   useEffect(() => {
-    refresh();
-  }, [refreshTrigger, refresh]);
+    if (prevRefreshTrigger.current === refreshTrigger) return;
+    prevRefreshTrigger.current = refreshTrigger;
+    refreshRef.current();
+  }, [refreshTrigger]);
 
   return (
     <Tabs

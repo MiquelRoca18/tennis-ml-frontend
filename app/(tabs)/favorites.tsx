@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   RefreshControl,
   ScrollView,
@@ -23,6 +23,8 @@ export default function FavoritesScreen() {
   const router = useRouter();
   const { user, isConfigured } = useAuth();
   const { favorites, loading, refresh } = useFavorites();
+  const refreshRef = useRef(refresh);
+  refreshRef.current = refresh;
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<FavoritesFilter>('all');
   const [liveMatchIds, setLiveMatchIds] = useState<Set<number>>(new Set());
@@ -34,11 +36,11 @@ export default function FavoritesScreen() {
     setRefreshing(false);
   };
 
-  // Refrescar favoritos cada vez que la pestaña gana foco (ej. al volver de añadir un favorito)
+  // Refrescar favoritos al entrar en la pestaña. Usamos ref para no depender de [refresh] y evitar bucle.
   useFocusEffect(
     useCallback(() => {
-      refresh();
-    }, [refresh])
+      refreshRef.current();
+    }, [])
   );
 
   const fetchLiveIds = useCallback(async () => {

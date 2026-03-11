@@ -1,6 +1,8 @@
 
 // API Configuration
 export const API_BASE_URL = 'https://tennis-ml-predictor-production.up.railway.app';
+/** Base URL para fotos de jugadores (API-Tennis). Si logo_url viene solo como "12345_nombre.jpg", se resuelve aquí. */
+export const PLAYER_LOGO_BASE_URL = 'https://api.api-tennis.com/logo-tennis';
 export const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 // Colors - FlashScore Style

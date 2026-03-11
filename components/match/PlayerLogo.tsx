@@ -1,6 +1,17 @@
 import React, { useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { Colors } from '../../constants/Colors';
+import { PLAYER_LOGO_BASE_URL } from '../../src/utils/constants';
+
+/** Convierte una URL de logo relativa (ej. "13552_t-paris.jpg") en absoluta (API-Tennis). */
+function resolveLogoUrl(raw: string | null | undefined): string | null {
+    if (typeof raw !== 'string' || !raw.trim()) return null;
+    const trimmed = raw.trim();
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    if (trimmed.includes('api-tennis.com')) return trimmed;
+    const path = trimmed.startsWith('/') ? trimmed.slice(1) : trimmed;
+    return `${PLAYER_LOGO_BASE_URL}/${path}`;
+}
 
 interface PlayerLogoProps {
     logo?: string;
@@ -13,7 +24,7 @@ interface PlayerLogoProps {
 export default function PlayerLogo({ logo, logoUrl, name = '', size = 40, style }: PlayerLogoProps) {
     const [imageError, setImageError] = useState(false);
     const rawUrl = logoUrl || logo;
-    const imageUrl = typeof rawUrl === 'string' && rawUrl.trim() ? rawUrl.trim() : null;
+    const imageUrl = resolveLogoUrl(rawUrl);
 
     // Get player initials for fallback
     const getInitials = (playerName: string): string => {

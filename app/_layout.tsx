@@ -11,6 +11,8 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
+import { Platform, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 
 import { Colors } from '@/constants/Colors';
@@ -58,7 +60,8 @@ export default function RootLayout() {
 
   if (!fontsLoaded) return null;
 
-  return (
+  const content = (
+    <>
     <AuthProvider>
       <BankrollProvider>
         <>
@@ -100,5 +103,12 @@ export default function RootLayout() {
         </>
       </BankrollProvider>
     </AuthProvider>
+    </>
+  );
+
+  return Platform.OS === 'web' ? (
+    <View style={{ flex: 1 }}>{content}</View>
+  ) : (
+    <GestureHandlerRootView style={{ flex: 1 }}>{content}</GestureHandlerRootView>
   );
 }

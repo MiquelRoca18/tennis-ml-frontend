@@ -34,7 +34,41 @@ function createWebStorage() {
 }
 
 function createNativeStorage() {
-  const SecureStore = require('expo-secure-store').default;
+  /**
+   * Cargamos expo-secure-store de forma segura:
+   * - En entornos nativos, usamos SecureStore.
+   * - Si por cualquier motivo el require falla o no expone los métodos,
+   *   hacemos fallback a AsyncStorage para no romper el flujo de auth.
+   */
+  let SecureStore: any = null;
+  try {
+    // Puede exportar directamente el objeto o vía .default según el bundler
+    const mod = require('expo-secure-store');
+    SecureStore = mod?.default ?? mod;
+  } catch (e) {
+    console.warn(
+      '[secureStorage] expo-secure-store no disponible, usando AsyncStorage como fallback',
+      e
+    );
+  }
+
+  const hasSecureStoreMethods =
+    SecureStore &&
+    typeof SecureStore.getItemAsync === 'function' &&
+    typeof SecureStore.setItemAsync === 'function' &&
+    typeof SecureStore.deleteItemAsync === 'function';
+
+  if (!hasSecureStoreMethods) {
+    console.warn(
+      '[secureStorage] Métodos de expo-secure-store no disponibles, usando AsyncStorage como fallback'
+    );
+    return {
+      getItem: (key: string) => AsyncStorage.getItem(key),
+      setItem: (key: string, value: string) => AsyncStorage.setItem(key, value),
+      removeItem: (key: string) => AsyncStorage.removeItem(key),
+    };
+  }
+
   return {
     getItem: (key: string) => SecureStore.getItemAsync(key),
     setItem: (key: string, value: string) => SecureStore.setItemAsync(key, value),

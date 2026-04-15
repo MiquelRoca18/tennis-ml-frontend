@@ -31,6 +31,18 @@ export default function MatchDetailV2({ matchId }: MatchDetailV2Props) {
     const { data, loading, error, refresh, isLive } = useMatchDetail(matchId);
     const [activeTab, setActiveTab] = useState<TabId>('Overview');
 
+    // Hooks must be declared before any early returns (React Rules of Hooks)
+    const isPending = data?.match?.status === 'pendiente';
+
+    const tabs = useMemo<{ id: TabId; label: string }[]>(() => [
+        { id: 'Overview', label: 'RESUMEN' },
+        ...(isPending ? [{ id: 'Prediction' as TabId, label: 'PREDICCIÓN' }, { id: 'Odds' as TabId, label: 'CUOTAS' }] : []),
+        ...(!isPending ? [{ id: 'Stats' as TabId, label: 'STATS' }] : []),
+        { id: 'H2H', label: 'H2H' },
+    ], [isPending]);
+
+    const handleTabPress = useCallback((id: TabId) => setActiveTab(id), []);
+
     // Loading State
     if (loading && !data) {
         return (
@@ -72,17 +84,6 @@ export default function MatchDetailV2({ matchId }: MatchDetailV2Props) {
             </View>
         );
     }
-
-    const isPending = data.match.status === 'pendiente';
-
-    const tabs = useMemo<{ id: TabId; label: string }[]>(() => [
-        { id: 'Overview', label: 'RESUMEN' },
-        ...(isPending ? [{ id: 'Prediction' as TabId, label: 'PREDICCIÓN' }, { id: 'Odds' as TabId, label: 'CUOTAS' }] : []),
-        ...(!isPending ? [{ id: 'Stats' as TabId, label: 'STATS' }] : []),
-        { id: 'H2H', label: 'H2H' },
-    ], [isPending]);
-
-    const handleTabPress = useCallback((id: TabId) => setActiveTab(id), []);
 
     const renderTabContent = () => {
         switch (activeTab) {

@@ -10,7 +10,7 @@
  * Usa el endpoint /matches/{id}/details para obtener todos los datos.
  */
 
-import React, { useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useMatchDetail } from '../../../../src/hooks/useMatchDetail';
 import { COLORS } from '../../../../src/utils/constants';
@@ -75,12 +75,14 @@ export default function MatchDetailV2({ matchId }: MatchDetailV2Props) {
 
     const isPending = data.match.status === 'pendiente';
 
-    const tabs: { id: TabId; label: string }[] = [
+    const tabs = useMemo<{ id: TabId; label: string }[]>(() => [
         { id: 'Overview', label: 'RESUMEN' },
         ...(isPending ? [{ id: 'Prediction' as TabId, label: 'PREDICCIÓN' }, { id: 'Odds' as TabId, label: 'CUOTAS' }] : []),
         ...(!isPending ? [{ id: 'Stats' as TabId, label: 'STATS' }] : []),
         { id: 'H2H', label: 'H2H' },
-    ];
+    ], [isPending]);
+
+    const handleTabPress = useCallback((id: TabId) => setActiveTab(id), []);
 
     const renderTabContent = () => {
         switch (activeTab) {
@@ -119,7 +121,7 @@ export default function MatchDetailV2({ matchId }: MatchDetailV2Props) {
                     <TouchableOpacity
                         key={tab.id}
                         style={[styles.tabItem, activeTab === tab.id && styles.tabItemActive]}
-                        onPress={() => setActiveTab(tab.id)}
+                        onPress={() => handleTabPress(tab.id)}
                     >
                         <Text style={[
                             styles.tabLabel,

@@ -20,7 +20,7 @@ interface OverviewTabV2Props {
     scrollable?: boolean;
 }
 
-export default function OverviewTabV2({ data, scrollable = true }: OverviewTabV2Props) {
+function OverviewTabV2Base({ data, scrollable = true }: OverviewTabV2Props) {
     const { match, player1, player2, stats, prediction } = data;
     const p1Short = getShortName(player1.name);
     const p2Short = getShortName(player2.name);
@@ -665,3 +665,6 @@ const styles = StyleSheet.create({
         lineHeight: 20,
     },
 });
+
+const OverviewTabV2 = React.memo(OverviewTabV2Base);
+export default OverviewTabV2;

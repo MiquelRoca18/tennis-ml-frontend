@@ -24,7 +24,7 @@ interface PredictionTabV2Props {
     onBetPlaced?: () => void;
 }
 
-export default function PredictionTabV2({ data, scrollable = true, onBetPlaced }: PredictionTabV2Props) {
+function PredictionTabV2Base({ data, scrollable = true, onBetPlaced }: PredictionTabV2Props) {
     const router = useRouter();
     const { user } = useAuth();
     const { saveBankroll } = useBankroll();
@@ -498,3 +498,6 @@ const styles = StyleSheet.create({
         lineHeight: 18,
     },
 });
+
+const PredictionTabV2 = React.memo(PredictionTabV2Base);
+export default PredictionTabV2;

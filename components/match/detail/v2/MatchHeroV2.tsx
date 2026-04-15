@@ -59,7 +59,7 @@ interface MatchHeroV2Props {
     data: MatchFullResponse;
 }
 
-export default function MatchHeroV2({ data }: MatchHeroV2Props) {
+function MatchHeroV2Base({ data }: MatchHeroV2Props) {
     const router = useRouter();
     const { match, player1, player2, winner, scores } = data;
     const { favorited, loading: favLoading, toggle } = useIsFavorite(match.id);
@@ -674,3 +674,6 @@ const styles = StyleSheet.create({
         color: '#FFF',
     },
 });
+
+const MatchHeroV2 = React.memo(MatchHeroV2Base);
+export default MatchHeroV2;

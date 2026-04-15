@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
     LayoutAnimation,
     Platform,
@@ -29,7 +29,7 @@ interface TournamentSectionProps {
     tournamentKey?: string | null;
 }
 
-export default function TournamentSection({
+function TournamentSectionBase({
     tournamentName,
     surface,
     matches,
@@ -40,16 +40,16 @@ export default function TournamentSection({
     const router = useRouter();
     const [isExpanded, setIsExpanded] = useState(initiallyExpanded);
 
-    const toggleExpand = () => {
+    const toggleExpand = useCallback(() => {
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-        setIsExpanded(!isExpanded);
-    };
+        setIsExpanded((prev) => !prev);
+    }, []);
 
-    const goToTournament = () => {
+    const goToTournament = useCallback(() => {
         if (tournamentKey) {
             router.push({ pathname: '/tournament/[key]', params: { key: tournamentKey, name: tournamentName } } as any);
         }
-    };
+    }, [router, tournamentKey, tournamentName]);
 
     // Count live matches (con datos API o ya empezados sin datos)
     const liveCount = matches.filter(m =>
@@ -119,6 +119,11 @@ export default function TournamentSection({
         </View>
     );
 }
+
+// React.memo: evita re-renders cuando cambia solo una card específica en otra sección.
+// Comparación por referencia de matches (el feed crea un nuevo array solo cuando cambia).
+const TournamentSection = React.memo(TournamentSectionBase);
+export default TournamentSection;
 
 
 const styles = StyleSheet.create({

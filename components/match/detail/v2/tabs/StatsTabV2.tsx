@@ -20,7 +20,7 @@ interface StatsTabV2Props {
 
 type StatsCategory = 'general' | 'serve' | 'return' | 'breakpoints' | 'points';
 
-export default function StatsTabV2({ data, scrollable = true }: StatsTabV2Props) {
+function StatsTabV2Base({ data, scrollable = true }: StatsTabV2Props) {
     const [stats, setStats] = useState<MatchStats | null>(data.stats || null);
     const [loading, setLoading] = useState(!data.stats?.has_detailed_stats);
     const [error, setError] = useState<string | null>(null);
@@ -746,3 +746,6 @@ const styles = StyleSheet.create({
         lineHeight: 20,
     },
 });
+
+const StatsTabV2 = React.memo(StatsTabV2Base);
+export default StatsTabV2;

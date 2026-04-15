@@ -131,7 +131,7 @@ export default function FavoriteMatchCard({ favorite, onFavoriteRemoved }: Favor
     };
   }, [favorite.matchId]);
 
-  const handlePress = () => {
+  const handlePress = (_m?: Match) => {
     router.push({
       pathname: '/match/[id]' as any,
       params: {

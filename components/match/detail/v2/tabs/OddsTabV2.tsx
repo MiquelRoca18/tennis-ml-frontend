@@ -42,7 +42,7 @@ interface OddsTabV2Props {
     scrollable?: boolean;
 }
 
-export default function OddsTabV2({ data, scrollable = true }: OddsTabV2Props) {
+function OddsTabV2Base({ data, scrollable = true }: OddsTabV2Props) {
     const [oddsData, setOddsData] = useState<DetailedOddsResponse | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -460,3 +460,6 @@ const styles = StyleSheet.create({
         lineHeight: 20,
     },
 });
+
+const OddsTabV2 = React.memo(OddsTabV2Base);
+export default OddsTabV2;

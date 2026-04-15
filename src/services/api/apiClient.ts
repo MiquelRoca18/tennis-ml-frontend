@@ -4,7 +4,10 @@ import { API_BASE_URL } from '../../utils/constants';
 // Create axios instance with default config
 const apiClient: AxiosInstance = axios.create({
     baseURL: API_BASE_URL,
-    timeout: 45000, // 45s (cold start + API externa en stats/detail)
+    // 15s: suficiente para cold starts moderados; el enriquecimiento live en backend
+    // tiene su propio timeout interno (5s) y el feed ya carga con live=false primero,
+    // por lo que un timeout de 45s solo alargaba errores de red.
+    timeout: 15000,
     headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',

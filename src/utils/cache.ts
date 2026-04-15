@@ -7,18 +7,25 @@ interface CacheEntry<T> {
 }
 
 /**
- * Simple in-memory cache with TTL support
+ * Simple in-memory cache with TTL + LRU eviction.
+ *
+ * LRU: cuando se supera `maxEntries`, se descarta la entrada menos recientemente
+ * usada (primera del Map). Evita memory leaks en sesiones largas donde el usuario
+ * abre muchos partidos / H2Hs.
  */
 class Cache {
     private cache = new Map<string, CacheEntry<any>>();
     private ttl: number;
+    private maxEntries: number;
 
     /**
      * Create a new cache instance
      * @param ttlMinutes - Time to live in minutes
+     * @param maxEntries - Máximo número de entradas antes de aplicar eviction LRU
      */
-    constructor(ttlMinutes = 5) {
+    constructor(ttlMinutes = 5, maxEntries = 100) {
         this.ttl = ttlMinutes * 60 * 1000;
+        this.maxEntries = maxEntries;
     }
 
     /**
@@ -36,6 +43,9 @@ class Cache {
             return null;
         }
 
+        // LRU touch: re-insertar al final para marcar como más reciente
+        this.cache.delete(key);
+        this.cache.set(key, entry);
         return entry.data;
     }
 
@@ -45,6 +55,13 @@ class Cache {
      * @param data - Data to cache
      */
     set<T>(key: string, data: T): void {
+        if (this.cache.has(key)) {
+            this.cache.delete(key);
+        } else if (this.cache.size >= this.maxEntries) {
+            // Descartar la entrada más antigua (primera del Map)
+            const oldest = this.cache.keys().next().value;
+            if (oldest !== undefined) this.cache.delete(oldest);
+        }
         this.cache.set(key, {
             data,
             timestamp: Date.now(),
@@ -87,12 +104,13 @@ class Cache {
     }
 }
 
-// Create cache instances with different TTLs for different data types
-export const playerCache = new Cache(10); // 10 minutes - player data changes rarely
-export const h2hCache = new Cache(30); // 30 minutes - H2H is static
-export const matchCache = new Cache(5); // 5 minutes - match data changes frequently
-export const tournamentCache = new Cache(60); // 1 hour - tournament data is static
-export const upcomingCache = new Cache(10); // 10 minutes - upcoming fixtures
+// Create cache instances with different TTLs and bounded sizes (LRU).
+// Los maxEntries se eligen para cubrir sesiones de uso intenso sin crecer sin control.
+export const playerCache = new Cache(10, 200); // 10 min, hasta 200 jugadores
+export const h2hCache = new Cache(30, 100); // 30 min, hasta 100 H2Hs cacheados
+export const matchCache = new Cache(5, 200); // 5 min, hasta 200 partidos
+export const tournamentCache = new Cache(60, 50); // 1 hora, hasta 50 torneos
+export const upcomingCache = new Cache(10, 50); // 10 min, hasta 50 listas de upcoming
 
 /**
  * Fetch data with caching support

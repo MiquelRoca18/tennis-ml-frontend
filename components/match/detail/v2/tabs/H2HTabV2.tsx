@@ -50,7 +50,7 @@ export interface PlayerRecentMatchItem {
     event_type: string;
 }
 
-export default function H2HTabV2({ data, scrollable = true }: H2HTabV2Props) {
+function H2HTabV2Base({ data, scrollable = true }: H2HTabV2Props) {
     const [h2hData, setH2hData] = useState<H2HResponse | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -771,3 +771,6 @@ const styles = StyleSheet.create({
         lineHeight: 20,
     },
 });
+
+const H2HTabV2 = React.memo(H2HTabV2Base);
+export default H2HTabV2;

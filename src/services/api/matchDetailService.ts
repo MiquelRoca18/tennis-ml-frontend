@@ -37,6 +37,9 @@ export const fetchMatchFull = async (
 /**
  * Prefetch del detalle de un partido (fire-and-forget).
  * Guarda el resultado en matchDetailCache para que al abrir la pantalla cargue al instante.
+ *
+ * Usa live=true: el backend ya cachea get_livescore/get_fixtures por 15s, así que
+ * el prefetch aprovecha datos en directo sin coste extra en la API externa.
  */
 export const prefetchMatchFull = (matchId: number): void => {
   if (__DEV__) {
@@ -44,7 +47,7 @@ export const prefetchMatchFull = (matchId: number): void => {
     console.log(`${label} - start`);
     console.time(label);
   }
-  fetchMatchFull(matchId, { live: false })
+  fetchMatchFull(matchId, { live: true })
     .then((data) => {
       setCachedMatchDetail(matchId, data);
       if (__DEV__) {

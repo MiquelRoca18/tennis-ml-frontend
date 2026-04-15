@@ -59,8 +59,12 @@ export function useSmartAutoRefresh(
     hasLiveMatches: boolean,
     onRefresh: () => void | Promise<void>
 ) {
-    // Faster refresh when there are live matches
-    const interval = hasLiveMatches ? 15000 : 60000; // 15s for live, 60s for pending
+    // Polling menos agresivo:
+    // - 45s con partidos en vivo (antes 15s → 3× menos carga en backend + API-Tennis)
+    // - 120s sin partidos en vivo (antes 60s)
+    // La caché TTL del backend (15s livescore, 60s fixtures) absorbe múltiples clientes
+    // concurrentes sin golpear la API externa.
+    const interval = hasLiveMatches ? 45000 : 120000;
 
     useAutoRefresh({
         enabled: true,

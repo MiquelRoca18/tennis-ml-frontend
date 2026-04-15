@@ -15,12 +15,14 @@ import PlayerLogo from './PlayerLogo';
 
 interface MatchCardProps {
     match: Match;
-    onPress: () => void;
+    /** Recibe el match; así el handler puede ser estable entre renders (clave para React.memo). */
+    onPress: (match: Match) => void;
     /** Se llama cuando se quita de favoritos (para actualizar la lista en la vista Favoritos) */
     onFavoriteRemoved?: () => void;
 }
 
-export default function MatchCard({ match, onPress, onFavoriteRemoved }: MatchCardProps) {
+function MatchCardBase({ match, onPress, onFavoriteRemoved }: MatchCardProps) {
+    const handlePress = React.useCallback(() => onPress(match), [onPress, match]);
     const router = useRouter();
     const { jugador1, jugador2, prediccion, estado, hora_inicio, is_live, resultado, fecha_partido, event_status } = match;
     const { favorited, loading: favLoading, toggle } = useIsFavorite(match.id);
@@ -93,9 +95,7 @@ export default function MatchCard({ match, onPress, onFavoriteRemoved }: MatchCa
             : shouldShowAsMarginal ? COLORS.warning
                 : COLORS.danger;
 
-    const handleCardPress = () => {
-        onPress();
-    };
+    const handleCardPress = handlePress;
 
     const handleFavoritePress = async () => {
         const result = await toggle({
@@ -316,6 +316,28 @@ export default function MatchCard({ match, onPress, onFavoriteRemoved }: MatchCa
         </>
     );
 }
+
+// Memoizamos: el feed renderiza N cards y la mayoría no cambia entre refrescos.
+// onPress se asume estable (el feed lo envuelve con useCallback y MatchCard recibe match por prop).
+const MatchCard = React.memo(MatchCardBase, (prev, next) => {
+    if (prev.onPress !== next.onPress) return false;
+    if (prev.onFavoriteRemoved !== next.onFavoriteRemoved) return false;
+    const a = prev.match;
+    const b = next.match;
+    // Compara los campos que afectan al render (estado, scores live, predicción).
+    return (
+        a.id === b.id &&
+        a.estado === b.estado &&
+        a.is_live === b.is_live &&
+        a.hora_inicio === b.hora_inicio &&
+        a.fecha_partido === b.fecha_partido &&
+        a.event_status === b.event_status &&
+        JSON.stringify(a.resultado) === JSON.stringify(b.resultado) &&
+        JSON.stringify(a.prediccion) === JSON.stringify(b.prediccion)
+    );
+});
+
+export default MatchCard;
 
 const styles = StyleSheet.create({
     cardWrapper: {

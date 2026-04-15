@@ -312,8 +312,9 @@ export default function MatchFeedScreen() {
     dispatch({ type: 'SET_LOADING', payload: true });
   };
 
-  // Navigate to match detail (pass bankroll so detail can show "según tu bankroll de X€" if needed)
-  const handleMatchPress = (match: Match) => {
+  // Navigate to match detail. useCallback para que MatchCard (React.memo) no se re-renderice
+  // por un callback nuevo en cada render del feed.
+  const handleMatchPress = useCallback((match: Match) => {
     prefetchMatchFull(match.id);
     router.push({
       pathname: '/match/[id]' as any,
@@ -323,7 +324,7 @@ export default function MatchFeedScreen() {
         ...(bettingConfig?.bankroll != null && { bankroll: String(bettingConfig.bankroll) }),
       },
     });
-  };
+  }, [router, bettingConfig?.bankroll]);
 
   // Un partido cuenta como "En directo" si tiene datos en vivo O si ya empezó y sigue pendiente (sin datos API)
   const isMatchInLiveTab = useCallback((m: Match) =>
@@ -378,9 +379,13 @@ export default function MatchFeedScreen() {
     return grouped;
   }, [statusFilteredMatches, isMatchInLiveTab]);
 
-  // Render match card
-  const renderMatch = (match: Match) => (
-    <MatchCard match={match} onPress={() => handleMatchPress(match)} />
+  // MatchCard ahora recibe `onPress: (match) => void` estable (misma referencia),
+  // lo que permite que React.memo descarte re-renders innecesarios.
+  const renderMatch = useCallback(
+    (match: Match) => (
+      <MatchCard match={match} onPress={handleMatchPress} />
+    ),
+    [handleMatchPress]
   );
 
   // Loading state

@@ -168,7 +168,7 @@ export default function TournamentDetailPage() {
                         renderItem={({ item }) => (
                             <MatchCard
                                 match={item}
-                                onPress={() => handleMatchPress(item)}
+                                onPress={handleMatchPress}
                             />
                         )}
                         contentContainerStyle={styles.listContent}

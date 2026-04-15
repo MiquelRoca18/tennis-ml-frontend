@@ -227,8 +227,10 @@ export interface MatchPrediction {
     kelly_stake_jugador1?: number | null;
     /** Stake sugerido en € (Kelly) para jugador 2 */
     kelly_stake_jugador2?: number | null;
-    /** Bankroll con el que se calculó el stake */
+    /** Bankroll con el que se calculó el stake (valor histórico) */
     bankroll_used?: number | null;
+    /** Bankroll actual del usuario al momento de la predicción */
+    bankroll_current?: number | null;
 }
 
 // ============================================================

@@ -27,7 +27,7 @@ interface PredictionTabV2Props {
 function PredictionTabV2Base({ data, scrollable = true, onBetPlaced }: PredictionTabV2Props) {
     const router = useRouter();
     const { user } = useAuth();
-    const { saveBankroll } = useBankroll();
+    const { saveBankroll, bankroll: currentBankroll } = useBankroll();
     const [showRegisterBetModal, setShowRegisterBetModal] = useState(false);
     const { prediction, player1, player2, odds, match: matchInfo } = data;
 
@@ -54,7 +54,8 @@ function PredictionTabV2Base({ data, scrollable = true, onBetPlaced }: Predictio
     const loserProb = isP1Winner ? prediction.probability_player2 : prediction.probability_player1;
 
     const stakeEur = (prediction.kelly_stake_jugador1 ?? 0) || (prediction.kelly_stake_jugador2 ?? 0);
-    const bankrollUsed = prediction.bankroll_used ?? 0;
+    const bankrollUsed = prediction.bankroll_used ?? prediction.bankroll_current ?? 0;
+    const bankrollForModal = currentBankroll ?? bankrollUsed ?? 0;
     const hasStake = stakeEur > 0;
     const recommendationText = prediction.recommendation ?? (prediction as { recomendacion?: string }).recomendacion ?? '';
 
@@ -131,8 +132,8 @@ function PredictionTabV2Base({ data, scrollable = true, onBetPlaced }: Predictio
                     {hasStake ? (
                         <>
                             <Text style={styles.stakeValue}>{stakeEur.toFixed(2)}€</Text>
-                            {bankrollUsed > 0 && (
-                                <Text style={styles.bankrollNote}> (bankroll {bankrollUsed.toFixed(0)}€)</Text>
+                            {bankrollForModal > 0 && (
+                                <Text style={styles.bankrollNote}> (bankroll {bankrollForModal.toFixed(0)}€)</Text>
                             )}
                         </>
                     ) : (
@@ -163,7 +164,7 @@ function PredictionTabV2Base({ data, scrollable = true, onBetPlaced }: Predictio
                 player2Name={player2.name}
                 recommendedPlayerSide={prediction.recommended_bet_side ?? prediction.predicted_winner}
                 suggestedStakeEur={stakeEur}
-                bankrollEur={bankrollUsed}
+                bankrollEur={bankrollForModal}
                 tournament={matchInfo?.tournament ?? ''}
             />
 

@@ -192,7 +192,7 @@ export default function RegisterBetModal({
                 return;
               }
               if (result.bankrollAfter != null) {
-                onBankrollUpdated?.(result.bankrollAfter);
+                await onBankrollUpdated?.(result.bankrollAfter);
               }
               onSuccess?.();
               onClose();

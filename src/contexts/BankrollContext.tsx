@@ -34,7 +34,8 @@ export function BankrollProvider({ children }: { children: React.ReactNode }) {
     try {
       const value = await getUserBankroll(user.id, { forceRefresh });
       setBankroll(value);
-      await updateBettingBankroll(value);
+      // Sincronización con el backend: fire-and-forget, no bloquea la carga del bankroll.
+      updateBettingBankroll(value).catch(() => {});
     } catch (e) {
       console.warn('[Bankroll] Error loading:', e);
       setBankroll(null);

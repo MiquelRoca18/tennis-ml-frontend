@@ -25,7 +25,10 @@ export default function LiquidationOnAppOpen() {
   }, [user?.id, refreshBankroll]);
 
   useEffect(() => {
-    runLiquidation();
+    // Delay inicial: deja que el feed y el bankroll carguen primero.
+    // La liquidación no es crítica para mostrar la pantalla principal.
+    const timer = setTimeout(runLiquidation, 8000);
+    return () => clearTimeout(timer);
   }, [runLiquidation]);
 
   useEffect(() => {

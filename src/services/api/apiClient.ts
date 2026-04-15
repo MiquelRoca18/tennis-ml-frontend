@@ -4,10 +4,9 @@ import { API_BASE_URL } from '../../utils/constants';
 // Create axios instance with default config
 const apiClient: AxiosInstance = axios.create({
     baseURL: API_BASE_URL,
-    // 15s: suficiente para cold starts moderados; el enriquecimiento live en backend
-    // tiene su propio timeout interno (5s) y el feed ya carga con live=false primero,
-    // por lo que un timeout de 45s solo alargaba errores de red.
-    timeout: 15000,
+    // 30s: cubre cold starts de Railway (~20-25s). El feed carga con live=false primero
+    // (respuesta rápida) y el enrichment live tiene su propio timeout interno de 5s.
+    timeout: 30000,
     headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',

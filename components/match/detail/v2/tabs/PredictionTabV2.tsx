@@ -58,9 +58,12 @@ function PredictionTabV2Base({ data, scrollable = true, onBetPlaced }: Predictio
     const bankrollForModal = currentBankroll ?? bankrollUsed ?? 0;
     const hasStake = stakeEur > 0;
     const recommendationText = prediction.recommendation ?? (prediction as { recomendacion?: string }).recomendacion ?? '';
+    // Hay recomendación de apostar si el texto contiene "apostar" pero no es "NO APOSTAR"
+    const recLower = recommendationText.toLowerCase();
+    const hasBetRecommendation = recLower.includes('apostar') && !recLower.startsWith('no');
 
     const openRegisterBetModal = () => {
-        if (!hasStake || stakeEur <= 0 || !matchInfo?.id) return;
+        if (!hasBetRecommendation || !matchInfo?.id) return;
         if (!user) {
             router.replace('/(auth)/login');
             return;
@@ -143,13 +146,13 @@ function PredictionTabV2Base({ data, scrollable = true, onBetPlaced }: Predictio
             </View>
 
             {/* Botón Registrar apuesta */}
-            {hasStake && matchInfo?.id && (
+            {hasBetRecommendation && matchInfo?.id && (
                 <TouchableOpacity
                     style={styles.betButton}
                     onPress={openRegisterBetModal}
                 >
                     <Text style={styles.betButtonText}>
-                        Registrar apuesta ({stakeEur.toFixed(2)}€)
+                        {hasStake ? `Registrar apuesta (${stakeEur.toFixed(2)}€)` : 'Registrar apuesta'}
                     </Text>
                 </TouchableOpacity>
             )}

@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useBankroll } from '../../src/contexts/BankrollContext';
-import { getBets, invalidateBetsCache, removeBet, deleteBetWithoutRefund } from '../../src/services/betsService';
+import { getBets, invalidateBetsCache, removeBet, deleteBetsWithoutRefund } from '../../src/services/betsService';
 import type { Bet } from '../../src/services/betsService';
 import { fetchMatchesStatusBatch, fetchRefreshResultsBatch } from '../../src/services/api/matchService';
 import { getShortName } from '../../src/types/matchDetail';
@@ -113,15 +113,14 @@ export default function BetsScreen() {
       // Liquidar apuestas de partidos ya completados
       if (list.length === 0) return;
       const matchIds = list.map((b) => b.matchId);
-      // Pedir al backend que actualice resultados de estos partidos antes de consultar estado
-      try {
-        await fetchRefreshResultsBatch(matchIds);
-      } catch (e) {
-        console.warn('[Bets] refresh-results-batch:', e);
-      }
+      // Pedir al backend que actualice resultados en paralelo con la consulta de estado
       let statusMap: Record<string, { status: string; winner: number | null; match_date?: string; match_time?: string }> = {};
       try {
-        statusMap = await fetchMatchesStatusBatch(matchIds);
+        const [, statusResult] = await Promise.all([
+          fetchRefreshResultsBatch(matchIds).catch((e) => console.warn('[Bets] refresh-results-batch:', e)),
+          fetchMatchesStatusBatch(matchIds),
+        ]);
+        statusMap = statusResult;
       } catch (e) {
         console.error('[Bets] status-batch failed:', e);
         // Si falla el batch, no liquidamos esta vez
@@ -158,9 +157,7 @@ export default function BetsScreen() {
           console.warn('[Bets] No se pudo actualizar bankroll tras liquidar:', e);
         }
       }
-      for (const bet of toDelete) {
-        await deleteBetWithoutRefund(bet, user?.id);
-      }
+      await deleteBetsWithoutRefund(toDelete, user?.id);
       if (toDelete.length > 0) {
         invalidateBetsCache(user?.id);
         const updated = await getBets(user?.id, { forceRefresh: true });

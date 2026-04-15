@@ -324,6 +324,37 @@ export async function deleteBetWithoutRefund(
   }
 }
 
+/**
+ * Elimina múltiples apuestas en una sola query (batch) sin devolver el stake.
+ * Evita el N+1 de llamar deleteBetWithoutRefund en bucle al liquidar.
+ */
+export async function deleteBetsWithoutRefund(
+  bets: Bet[],
+  userId?: string | null
+): Promise<{ success: boolean; error?: string }> {
+  if (bets.length === 0) return { success: true };
+  if (userId && isSupabaseConfigured) {
+    const ids = bets.map((b) => b.id);
+    const { error } = await supabase.from('bets').delete().in('id', ids).eq('user_id', userId);
+    if (error) {
+      console.error('[Bets] Error Supabase deleteBetsWithoutRefund:', error.message);
+      return { success: false, error: error.message };
+    }
+    invalidateBetsCache(userId);
+    return { success: true };
+  }
+  try {
+    const list = await getBets(userId, { activeOnly: false });
+    const idSet = new Set(bets.map((b) => b.id));
+    const filtered = list.filter((b) => !idSet.has(b.id));
+    await AsyncStorage.setItem(BETS_KEY, JSON.stringify(filtered));
+    return { success: true };
+  } catch (e) {
+    console.error('[Bets] Error AsyncStorage deleteBetsWithoutRefund:', e);
+    return { success: false, error: 'No se pudo eliminar las apuestas' };
+  }
+}
+
 function isSamePlayer(winnerName: string, pickedPlayer: string): boolean {
   if (!winnerName?.trim() || !pickedPlayer?.trim()) return false;
   const w = winnerName.trim().toLowerCase();
@@ -343,14 +374,15 @@ export async function liquidateSettledBets(userId: string): Promise<void> {
   const list = await getBets(userId, { forceRefresh: true });
   if (list.length === 0) return;
   const matchIds = list.map((b) => b.matchId);
-  try {
-    await fetchRefreshResultsBatch(matchIds);
-  } catch (e) {
-    if (__DEV__) console.warn('[Bets] liquidateSettledBets refresh-results:', e);
-  }
   let statusMap: Record<string, { status: string; winner: number | null }> = {};
   try {
-    statusMap = await fetchMatchesStatusBatch(matchIds);
+    const [, statusResult] = await Promise.all([
+      fetchRefreshResultsBatch(matchIds).catch((e) => {
+        if (__DEV__) console.warn('[Bets] liquidateSettledBets refresh-results:', e);
+      }),
+      fetchMatchesStatusBatch(matchIds),
+    ]);
+    statusMap = statusResult;
   } catch (e) {
     if (__DEV__) console.warn('[Bets] liquidateSettledBets status-batch:', e);
     return;
@@ -377,10 +409,5 @@ export async function liquidateSettledBets(userId: string): Promise<void> {
       if (__DEV__) console.warn('[Bets] liquidateSettledBets bankroll update:', e);
     }
   }
-  for (const bet of toDelete) {
-    await deleteBetWithoutRefund(bet, userId);
-  }
-  if (toDelete.length > 0) {
-    invalidateBetsCache(userId);
-  }
+  await deleteBetsWithoutRefund(toDelete, userId);
 }

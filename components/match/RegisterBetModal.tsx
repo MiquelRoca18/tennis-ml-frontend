@@ -52,6 +52,8 @@ export interface RegisterBetModalProps {
   suggestedStakeEur: number;
   bankrollEur: number;
   tournament: string;
+  /** Cuotas precargadas desde MatchFullResponse para mostrar inmediatamente */
+  preloadedOdds?: { bookmaker: string; player1_odds: number | null; player2_odds: number | null }[];
 }
 
 export default function RegisterBetModal({
@@ -66,10 +68,19 @@ export default function RegisterBetModal({
   suggestedStakeEur,
   bankrollEur,
   tournament,
+  preloadedOdds,
 }: RegisterBetModalProps) {
   const { user } = useAuth();
-  const [oddsData, setOddsData] = useState<DetailedOddsResponse | null>(null);
-  const [loadingOdds, setLoadingOdds] = useState(false);
+  const [oddsData, setOddsData] = useState<DetailedOddsResponse | null>(preloadedOdds ? {
+    success: true,
+    player1_name: player1Name,
+    player2_name: player2Name,
+    best_odds_player1: null,
+    best_odds_player2: null,
+    bookmakers: preloadedOdds,
+    total_bookmakers: preloadedOdds.length,
+  } : null);
+  const [loadingOdds, setLoadingOdds] = useState(!preloadedOdds);
   const [oddsError, setOddsError] = useState<string | null>(null);
 
   const [selectedBookmakerIndex, setSelectedBookmakerIndex] = useState(0);
@@ -92,22 +103,44 @@ export default function RegisterBetModal({
   useEffect(() => {
     if (!visible || !matchId) return;
     setOddsError(null);
-    setLoadingOdds(true);
-    fetchMatchOddsDetailed(matchId)
-      .then((data) => {
-        setOddsData(data);
-        if (data.bookmakers?.length) {
-          const bestIndex = indexOfBestOddsForPlayer(data.bookmakers, recommendedPlayerSide);
-          setSelectedBookmakerIndex(bestIndex);
-          const best = data.bookmakers[bestIndex];
-          const odds = recommendedPlayerSide === 1 ? best.player1_odds : best.player2_odds;
-          setOddsInput(odds != null && odds >= 1 ? odds.toFixed(2) : '');
-        }
-        setAmountInput(suggestedStakeEur > 0 ? suggestedStakeEur.toFixed(2) : '');
-      })
-      .catch(() => setOddsError('No se pudieron cargar las cuotas'))
-      .finally(() => setLoadingOdds(false));
-  }, [visible, matchId, recommendedPlayerSide, suggestedStakeEur]);
+
+    // Si ya tenemos cuotas precargadas, usar inmediatamente; sino cargar del servidor
+    if (preloadedOdds && preloadedOdds.length > 0) {
+      const bestIndex = indexOfBestOddsForPlayer(preloadedOdds, recommendedPlayerSide);
+      setSelectedBookmakerIndex(bestIndex);
+      const best = preloadedOdds[bestIndex];
+      const odds = recommendedPlayerSide === 1 ? best.player1_odds : best.player2_odds;
+      setOddsInput(odds != null && odds >= 1 ? odds.toFixed(2) : '');
+      setAmountInput(suggestedStakeEur > 0 ? suggestedStakeEur.toFixed(2) : '');
+      setLoadingOdds(false);
+
+      // Enriquecer en segundo plano (no bloquea la UI)
+      fetchMatchOddsDetailed(matchId)
+        .then((data) => {
+          if (data.bookmakers?.length && data.bookmakers.length > preloadedOdds.length) {
+            setOddsData(data);
+          }
+        })
+        .catch(() => {/* silenciar error en background */});
+    } else {
+      // Sin precarga: cargar desde servidor
+      setLoadingOdds(true);
+      fetchMatchOddsDetailed(matchId)
+        .then((data) => {
+          setOddsData(data);
+          if (data.bookmakers?.length) {
+            const bestIndex = indexOfBestOddsForPlayer(data.bookmakers, recommendedPlayerSide);
+            setSelectedBookmakerIndex(bestIndex);
+            const best = data.bookmakers[bestIndex];
+            const odds = recommendedPlayerSide === 1 ? best.player1_odds : best.player2_odds;
+            setOddsInput(odds != null && odds >= 1 ? odds.toFixed(2) : '');
+          }
+          setAmountInput(suggestedStakeEur > 0 ? suggestedStakeEur.toFixed(2) : '');
+        })
+        .catch(() => setOddsError('No se pudieron cargar las cuotas'))
+        .finally(() => setLoadingOdds(false));
+    }
+  }, [visible, matchId, recommendedPlayerSide, suggestedStakeEur, preloadedOdds]);
 
   // Cuando cambia la casa seleccionada, actualizar cuota por defecto si el input está vacío o coincide con la anterior por defecto
   useEffect(() => {
@@ -186,7 +219,7 @@ export default function RegisterBetModal({
                 potentialWin,
                 status: 'activa',
               };
-              const result = await addBet(input, user?.id);
+              const result = await addBet(input, user?.id, undefined, bankrollEur);
               if (!result.success) {
                 Alert.alert('Error', result.error ?? 'No se pudo registrar la apuesta');
                 return;

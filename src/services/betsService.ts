@@ -157,7 +157,8 @@ export async function getBets(
 export async function addBet(
   input: BetInput,
   userId?: string | null,
-  eventKey?: string | null
+  eventKey?: string | null,
+  currentBankroll?: number
 ): Promise<{ success: boolean; bankrollAfter?: number; error?: string }> {
   const { matchId, stakeEur, player1Name, player2Name, tournament, bookmaker, odds, pickedPlayer } = input;
   if (stakeEur <= 0) {
@@ -176,8 +177,12 @@ export async function addBet(
   const potentialWin = stakeEur * odds;
 
   try {
-    const settings = await fetchBettingSettings();
-    const bankroll = settings.bankroll ?? 0;
+    // Usar bankroll pasado como parámetro (del contexto) si está disponible, sino consultarlo
+    let bankroll = currentBankroll;
+    if (bankroll === undefined) {
+      const settings = await fetchBettingSettings();
+      bankroll = settings.bankroll ?? 0;
+    }
     if (bankroll < stakeEur) {
       return {
         success: false,
@@ -231,7 +236,7 @@ export async function addBet(
       return { success: false, error: error.message, bankrollAfter: undefined };
     }
     invalidateBetsCache(userId);
-    return { success: true, bankrollAfter: await fetchBettingSettings().then((r) => r.bankroll) };
+    return { success: true, bankrollAfter: newBankroll };
   }
 
   try {

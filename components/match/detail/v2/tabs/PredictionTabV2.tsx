@@ -169,6 +169,7 @@ function PredictionTabV2Base({ data, scrollable = true, onBetPlaced }: Predictio
                 suggestedStakeEur={stakeEur}
                 bankrollEur={bankrollForModal}
                 tournament={matchInfo?.tournament ?? ''}
+                preloadedOdds={odds?.bookmakers}
             />
 
             {/* Model Info */}

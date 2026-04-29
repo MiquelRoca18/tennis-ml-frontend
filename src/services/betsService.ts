@@ -176,6 +176,8 @@ export async function addBet(
 
   const potentialWin = stakeEur * odds;
 
+  let newBankroll: number;
+
   try {
     // Usar bankroll pasado como parámetro (del contexto) si está disponible, sino consultarlo
     let bankroll = currentBankroll;
@@ -189,7 +191,7 @@ export async function addBet(
         error: `Bankroll insuficiente (tienes ${bankroll.toFixed(0)}€, apuesta ${stakeEur.toFixed(2)}€)`,
       };
     }
-    const newBankroll = bankroll - stakeEur;
+    newBankroll = bankroll - stakeEur;
     await updateBettingBankroll(newBankroll);
     if (userId) {
       try {

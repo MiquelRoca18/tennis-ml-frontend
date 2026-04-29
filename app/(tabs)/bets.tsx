@@ -75,6 +75,9 @@ export default function BetsScreen() {
   const [matchSchedule, setMatchSchedule] = useState<Record<string, { match_date?: string; match_time?: string }>>({});
   /** True mientras la pestaña Mis apuestas está en foco (para refrescar al volver a la app) */
   const isBetsFocusedRef = useRef(false);
+  /** Throttle: solo actualizar resultados cada 5 minutos para evitar exceso de consultas a API */
+  const lastRefreshResultsRef = useRef<number>(0);
+  const REFRESH_RESULTS_THROTTLE_MS = 5 * 60 * 1000;
 
   const handleDeleteBet = useCallback(
     (bet: Bet) => {
@@ -113,14 +116,20 @@ export default function BetsScreen() {
       // Liquidar apuestas de partidos ya completados
       if (list.length === 0) return;
       const matchIds = list.map((b) => b.matchId);
-      // Pedir al backend que actualice resultados en paralelo con la consulta de estado
+      // Pedir al backend que actualice resultados (con throttle 5min) en paralelo con la consulta de estado
       let statusMap: Record<string, { status: string; winner: number | null; match_date?: string; match_time?: string }> = {};
       try {
-        const [, statusResult] = await Promise.all([
-          fetchRefreshResultsBatch(matchIds).catch((e) => console.warn('[Bets] refresh-results-batch:', e)),
-          fetchMatchesStatusBatch(matchIds),
-        ]);
-        statusMap = statusResult;
+        const shouldRefreshResults = Date.now() - lastRefreshResultsRef.current > REFRESH_RESULTS_THROTTLE_MS;
+        if (shouldRefreshResults) {
+          lastRefreshResultsRef.current = Date.now();
+          const [, statusResult] = await Promise.all([
+            fetchRefreshResultsBatch(matchIds).catch((e) => console.warn('[Bets] refresh-results-batch:', e)),
+            fetchMatchesStatusBatch(matchIds),
+          ]);
+          statusMap = statusResult;
+        } else {
+          statusMap = await fetchMatchesStatusBatch(matchIds);
+        }
       } catch (e) {
         console.error('[Bets] status-batch failed:', e);
         // Si falla el batch, no liquidamos esta vez

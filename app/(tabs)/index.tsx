@@ -12,6 +12,7 @@ import ErrorMessage from '../../components/common/ErrorMessage';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import DateSelector from '../../components/match/DateSelector';
 import MatchCard from '../../components/match/MatchCard';
+import CircuitToggle, { CircuitFilterValue } from '../../components/match/CircuitToggle';
 import StatusFilterTabs, { StatusFilterValue } from '../../components/match/StatusFilterTabs';
 import TournamentSection from '../../components/match/TournamentSection';
 import { useFavoritesRefresh } from '../../src/contexts/FavoritesRefreshContext';
@@ -177,6 +178,7 @@ export default function MatchFeedScreen() {
   const { matches, loading, refreshing, error, matchesSummary, bettingConfig } = feedState;
   const [selectedDate, setSelectedDate] = useState<string>(() => getTodayDate());
   const [statusFilter, setStatusFilter] = useState<StatusFilterValue>('ALL');
+  const [circuitFilter, setCircuitFilter] = useState<CircuitFilterValue>('ALL');
 
   // Generate date range for selector (7 days before and after today)
   const dateRange = useMemo(() => getDateRange(7, 7), []);
@@ -331,22 +333,35 @@ export default function MatchFeedScreen() {
     m.estado === 'en_juego' || (isMatchStarted(m.fecha_partido, m.hora_inicio) && m.estado === 'pendiente'),
   []);
 
+  // Filter by circuit (ALL, ATP, WTA, Challenger)
+  const circuitFilteredMatches = useMemo(() => {
+    if (circuitFilter === 'ALL') return matches;
+    return matches.filter(m => (m.circuit || 'atp') === circuitFilter);
+  }, [matches, circuitFilter]);
+
+  const circuitCounts = useMemo(() => ({
+    all: matches.length,
+    atp: matches.filter(m => (m.circuit || 'atp') === 'atp').length,
+    wta: matches.filter(m => m.circuit === 'wta').length,
+    challenger: matches.filter(m => m.circuit === 'challenger').length,
+  }), [matches]);
+
   // Filter by status (Todos, Finalizados, Por jugar, En directo)
   // "Por jugar" = solo pendientes que aún no han empezado (los que ya empezaron solo en "En directo")
   const statusFilteredMatches = useMemo(() => {
-    if (statusFilter === 'ALL') return matches;
-    if (statusFilter === 'en_juego') return matches.filter(isMatchInLiveTab);
-    if (statusFilter === 'pendiente') return matches.filter(m => m.estado === 'pendiente' && !isMatchInLiveTab(m));
-    return matches.filter(m => m.estado === statusFilter);
-  }, [matches, statusFilter, isMatchInLiveTab]);
+    if (statusFilter === 'ALL') return circuitFilteredMatches;
+    if (statusFilter === 'en_juego') return circuitFilteredMatches.filter(isMatchInLiveTab);
+    if (statusFilter === 'pendiente') return circuitFilteredMatches.filter(m => m.estado === 'pendiente' && !isMatchInLiveTab(m));
+    return circuitFilteredMatches.filter(m => m.estado === statusFilter);
+  }, [circuitFilteredMatches, statusFilter, isMatchInLiveTab]);
 
-  // Status counts: pendiente = solo los que no cuentan como "en directo"
+  // Status counts: based on circuit-filtered matches
   const statusCounts = useMemo(() => ({
-    all: matches.length,
-    completado: matches.filter(m => m.estado === 'completado').length,
-    pendiente: matches.filter(m => m.estado === 'pendiente' && !isMatchInLiveTab(m)).length,
-    en_juego: matches.filter(isMatchInLiveTab).length,
-  }), [matches, isMatchInLiveTab]);
+    all: circuitFilteredMatches.length,
+    completado: circuitFilteredMatches.filter(m => m.estado === 'completado').length,
+    pendiente: circuitFilteredMatches.filter(m => m.estado === 'pendiente' && !isMatchInLiveTab(m)).length,
+    en_juego: circuitFilteredMatches.filter(isMatchInLiveTab).length,
+  }), [circuitFilteredMatches, isMatchInLiveTab]);
 
   // Group matches by tournament (from status-filtered list)
   const matchesByTournament = useMemo(() => {
@@ -439,6 +454,15 @@ export default function MatchFeedScreen() {
         selectedDate={selectedDate}
         onDateSelect={handleDateSelect}
       />
+
+      {/* Circuit Toggle: ALL, ATP, WTA, Challenger (hidden when only ATP) */}
+      {(circuitCounts.wta > 0 || circuitCounts.challenger > 0) && (
+        <CircuitToggle
+          selected={circuitFilter}
+          onChange={setCircuitFilter}
+          counts={circuitCounts}
+        />
+      )}
 
       {/* Status Filter Tabs: Todos, Finalizados, Por jugar, En directo */}
       <StatusFilterTabs

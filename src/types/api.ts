@@ -103,6 +103,8 @@ export interface Match {
     resultado: MatchResult | null;
     /** Motivo de finalización: "Retired", "Walk Over", etc. Para mostrar en card. */
     event_status?: string | null;
+    /** Tennis circuit: 'atp', 'wta', or 'challenger'. Defaults to 'atp' for legacy matches. */
+    circuit?: 'atp' | 'wta' | 'challenger' | null;
 }
 
 /** Configuración de apuestas usada para los stakes mostrados (bankroll actual) */

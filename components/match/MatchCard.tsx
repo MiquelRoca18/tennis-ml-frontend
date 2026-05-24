@@ -74,31 +74,16 @@ function MatchCardBase({ match, onPress, onFavoriteRemoved }: MatchCardProps) {
 
     // Determine best option and EV (only for pending matches)
     const bestEV = prediccion ? Math.max(prediccion.jugador1_ev, prediccion.jugador2_ev) : 0;
-    const isBet = bestEV > EV_THRESHOLD_BET;
     const isMarginal = bestEV > EV_THRESHOLD_MARGINAL && bestEV <= EV_THRESHOLD_BET;
 
     // Trust backend recommendation field directly (already filtered with circuit thresholds)
     const recomendacion = prediccion?.recomendacion ?? '';
     const isApostar = recomendacion.toLowerCase().startsWith('apostar');
 
-    // Determine confidence level (prefer new format)
-    const confidenceLevel = prediccion?.confidence_level;
-    const isLowConfidence = confidenceLevel === 'LOW' || confidenceLevel === 'UNKNOWN';
-    const isMediumConfidence = confidenceLevel === 'MEDIUM';
-    const isHighConfidence = confidenceLevel === 'HIGH';
-    const showConfidenceWarning = isLowConfidence || isMediumConfidence;
-
-    // APOSTAR: green for HIGH/MEDIUM confidence, orange for LOW confidence
-    // Non-APOSTAR: keep legacy marginal/danger logic
-    const shouldShowAsGoodBet = isApostar && !isLowConfidence;
-    const shouldShowAsMarginalBet = isApostar && isLowConfidence;
-    const shouldShowAsMarginal = !isApostar && (isMarginal || (isBet && isMediumConfidence));
-
-    // Color: APOSTAR-HIGH/MED → green, APOSTAR-LOW → orange, rest → legacy
-    const evColor = shouldShowAsGoodBet ? COLORS.success
-        : shouldShowAsMarginalBet ? COLORS.warning
-            : shouldShowAsMarginal ? COLORS.warning
-                : COLORS.danger;
+    // Color: APOSTAR → green always (same as backtesting — no confidence filter), rest → legacy
+    const evColor = isApostar ? COLORS.success
+        : isMarginal ? COLORS.warning
+            : COLORS.danger;
 
     const handleCardPress = handlePress;
 
@@ -279,18 +264,11 @@ function MatchCardBase({ match, onPress, onFavoriteRemoved }: MatchCardProps) {
                     {/* Footer - EV, badge APOSTAR y cantidad sugerida */}
                     {shouldShowPrediction && prediccion && (
                         <View style={styles.footer}>
-                            {/* APOSTAR badge: verde (alta confianza) o naranja (baja confianza) */}
+                            {/* APOSTAR badge */}
                             {isApostar && (
-                                <View style={[
-                                    styles.apostaBadge,
-                                    { backgroundColor: shouldShowAsGoodBet ? COLORS.success + '22' : COLORS.warning + '22' }
-                                ]}>
-                                    <Text style={[
-                                        styles.apostaBadgeText,
-                                        { color: shouldShowAsGoodBet ? COLORS.success : COLORS.warning }
-                                    ]}>
-                                        {shouldShowAsGoodBet ? '✅' : '⚠️'} {recomendacion}
-                                        {shouldShowAsMarginalBet ? '  ·  baja confianza' : ''}
+                                <View style={[styles.apostaBadge, { backgroundColor: COLORS.success + '22' }]}>
+                                    <Text style={[styles.apostaBadgeText, { color: COLORS.success }]}>
+                                        ✅ {recomendacion}
                                     </Text>
                                 </View>
                             )}

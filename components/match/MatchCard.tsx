@@ -77,6 +77,10 @@ function MatchCardBase({ match, onPress, onFavoriteRemoved }: MatchCardProps) {
     const isBet = bestEV > EV_THRESHOLD_BET;
     const isMarginal = bestEV > EV_THRESHOLD_MARGINAL && bestEV <= EV_THRESHOLD_BET;
 
+    // Trust backend recommendation field directly (already filtered with circuit thresholds)
+    const recomendacion = prediccion?.recomendacion ?? '';
+    const isApostar = recomendacion.toLowerCase().startsWith('apostar');
+
     // Determine confidence level (prefer new format)
     const confidenceLevel = prediccion?.confidence_level;
     const isLowConfidence = confidenceLevel === 'LOW' || confidenceLevel === 'UNKNOWN';
@@ -84,14 +88,15 @@ function MatchCardBase({ match, onPress, onFavoriteRemoved }: MatchCardProps) {
     const isHighConfidence = confidenceLevel === 'HIGH';
     const showConfidenceWarning = isLowConfidence || isMediumConfidence;
 
-    // INTELLIGENT RECOMMENDATION LOGIC: Consider both EV and confidence
-    // Only show green if BOTH EV is good AND confidence is high (or no confidence data for backward compatibility)
-    const shouldShowAsGoodBet = isBet && (isHighConfidence || !confidenceLevel);
-    const shouldShowAsMarginal = (isMarginal || (isBet && isMediumConfidence)) && !isLowConfidence;
+    // APOSTAR: green for HIGH/MEDIUM confidence, orange for LOW confidence
+    // Non-APOSTAR: keep legacy marginal/danger logic
+    const shouldShowAsGoodBet = isApostar && !isLowConfidence;
+    const shouldShowAsMarginalBet = isApostar && isLowConfidence;
+    const shouldShowAsMarginal = !isApostar && (isMarginal || (isBet && isMediumConfidence));
 
-    // Determine color based on intelligent logic
-    const evColor = isLowConfidence ? COLORS.danger
-        : shouldShowAsGoodBet ? COLORS.success
+    // Color: APOSTAR-HIGH/MED → green, APOSTAR-LOW → orange, rest → legacy
+    const evColor = shouldShowAsGoodBet ? COLORS.success
+        : shouldShowAsMarginalBet ? COLORS.warning
             : shouldShowAsMarginal ? COLORS.warning
                 : COLORS.danger;
 
@@ -271,9 +276,24 @@ function MatchCardBase({ match, onPress, onFavoriteRemoved }: MatchCardProps) {
                         </View>
                     </>
 
-                    {/* Footer - Solo EV y cantidad sugerida (sin texto de recomendación ni confianza) */}
+                    {/* Footer - EV, badge APOSTAR y cantidad sugerida */}
                     {shouldShowPrediction && prediccion && (
                         <View style={styles.footer}>
+                            {/* APOSTAR badge: verde (alta confianza) o naranja (baja confianza) */}
+                            {isApostar && (
+                                <View style={[
+                                    styles.apostaBadge,
+                                    { backgroundColor: shouldShowAsGoodBet ? COLORS.success + '22' : COLORS.warning + '22' }
+                                ]}>
+                                    <Text style={[
+                                        styles.apostaBadgeText,
+                                        { color: shouldShowAsGoodBet ? COLORS.success : COLORS.warning }
+                                    ]}>
+                                        {shouldShowAsGoodBet ? '✅' : '⚠️'} {recomendacion}
+                                        {shouldShowAsMarginalBet ? '  ·  baja confianza' : ''}
+                                    </Text>
+                                </View>
+                            )}
                             <View style={styles.footerTop}>
                                 <Text style={styles.evLabel}>EV:</Text>
                                 <Text style={[styles.evValue, { color: evColor }]}>
@@ -485,6 +505,16 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontWeight: '700',
         color: COLORS.success,
+    },
+    apostaBadge: {
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        marginBottom: 4,
+    },
+    apostaBadgeText: {
+        fontSize: 12,
+        fontWeight: '700',
     },
     warningBanner: {
         flexDirection: 'row',

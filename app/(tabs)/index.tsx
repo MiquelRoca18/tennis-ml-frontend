@@ -273,13 +273,10 @@ export default function MatchFeedScreen() {
     loadMatches(selectedDate, true);
   }, [selectedDate, loadMatches]);
 
-  // Solo considerar "en vivo" si el partido ha empezado (fecha+hora en el pasado)
+  // "En vivo" = lo que confirma el backend (estado en_juego / is_live). No lo inferimos por
+  // reloj: un partido pendiente cuya hora ya pasó puede haber terminado, así evitamos falsos LIVE.
   const hasLiveMatches = useMemo(() => {
-    return matches.some(match => {
-      const backendSaysLive = match.estado === 'en_juego' || Boolean(match.is_live);
-      const hasStarted = isMatchStarted(match.fecha_partido, match.hora_inicio);
-      return backendSaysLive && hasStarted;
-    });
+    return matches.some(match => match.estado === 'en_juego' || Boolean(match.is_live));
   }, [matches]);
 
   // Partidos cuya hora ya pasó pero el listado aún los marca pendiente → refrescar cada 15s para pillar el cambio a "en directo"
@@ -328,9 +325,11 @@ export default function MatchFeedScreen() {
     });
   }, [router, bettingConfig?.bankroll]);
 
-  // Un partido cuenta como "En directo" si tiene datos en vivo O si ya empezó y sigue pendiente (sin datos API)
+  // Un partido cuenta como "En directo" SOLO si el backend lo confirma (estado en_juego / is_live).
+  // El backend ingiere datos en vivo en tiempo real (WebSocket + livescore), así que este es el
+  // origen de verdad; no marcamos LIVE por reloj para no mostrar partidos ya terminados.
   const isMatchInLiveTab = useCallback((m: Match) =>
-    m.estado === 'en_juego' || (isMatchStarted(m.fecha_partido, m.hora_inicio) && m.estado === 'pendiente'),
+    m.estado === 'en_juego' || Boolean(m.is_live),
   []);
 
   // Filter by circuit (ALL, ATP, WTA, Challenger)

@@ -99,6 +99,20 @@ export function isMatchStarted(fecha: string, hora: string | null): boolean {
 }
 
 /**
+ * Fuente de verdad de "en directo": lo confirma el backend (estado en_juego / is_live).
+ * NO se infiere por reloj: un partido pendiente cuya hora ya pasó puede haber terminado,
+ * así evitamos falsos LIVE. El backend deriva is_live de (estado_efectivo === 'en_juego').
+ */
+export function isLiveMatch(match: {
+    estado?: string | null;
+    is_live?: boolean | string | number | null;
+}): boolean {
+    if (match.estado === 'en_juego') return true;
+    const v = match.is_live;
+    return v === true || v === 1 || v === '1';
+}
+
+/**
  * Generate an array of dates for the date selector
  * @param daysBefore - Number of days before today
  * @param daysAfter - Number of days after today

@@ -12,7 +12,7 @@ import {
 import Svg, { Path } from 'react-native-svg';
 import { Match } from '../../src/types/api';
 import { COLORS } from '../../src/utils/constants';
-import { isMatchStarted } from '../../src/utils/dateUtils';
+import { isLiveMatch } from '../../src/utils/dateUtils';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -51,10 +51,9 @@ function TournamentSectionBase({
         }
     }, [router, tournamentKey, tournamentName]);
 
-    // Count live matches (con datos API o ya empezados sin datos)
-    const liveCount = matches.filter(m =>
-        m.estado === 'en_juego' || (isMatchStarted(m.fecha_partido, m.hora_inicio) && m.estado === 'pendiente')
-    ).length;
+    // Cuenta "en directo" según el backend (estado en_juego / is_live), nunca por reloj.
+    // Así un partido pendiente cuya hora ya pasó no se marca como live por error.
+    const liveCount = matches.filter(isLiveMatch).length;
 
     return (
         <View style={styles.container}>

@@ -14,13 +14,13 @@ import { Match, TournamentMatchesResponse } from '../../src/types/api';
 import { COLORS } from '../../src/utils/constants';
 import MatchCard from '../../components/match/MatchCard';
 import DateSelector from '../../components/match/DateSelector';
-import { getTodayDate } from '../../src/utils/dateUtils';
+import { getTodayDate, isLiveMatch } from '../../src/utils/dateUtils';
 
 /** Ordenar partidos: en vivo primero, luego por fecha y hora */
 function sortMatchesByDateAndTime(matches: Match[]): Match[] {
     return [...matches].sort((a, b) => {
-        const aLive = a.estado === 'en_juego' || Boolean(a.is_live);
-        const bLive = b.estado === 'en_juego' || Boolean(b.is_live);
+        const aLive = isLiveMatch(a);
+        const bLive = isLiveMatch(b);
         if (aLive && !bLive) return -1;
         if (!aLive && bLive) return 1;
         const dateA = (a.fecha_partido || '').slice(0, 10);

@@ -22,7 +22,7 @@ import { prefetchMatchFull } from '../../src/services/api/matchDetailService';
 import { getCachedMatches, setCachedMatches } from '../../src/services/api/matchesCache';
 import { Match } from '../../src/types/api';
 import { COLORS } from '../../src/utils/constants';
-import { formatDateLong, getDateRange, getTodayDate, isMatchStarted } from '../../src/utils/dateUtils';
+import { formatDateLong, getDateRange, getTodayDate, isLiveMatch, isMatchStarted } from '../../src/utils/dateUtils';
 
 const feedLayoutStyles = StyleSheet.create({
   summaryBar: {
@@ -276,7 +276,7 @@ export default function MatchFeedScreen() {
   // "En vivo" = lo que confirma el backend (estado en_juego / is_live). No lo inferimos por
   // reloj: un partido pendiente cuya hora ya pasó puede haber terminado, así evitamos falsos LIVE.
   const hasLiveMatches = useMemo(() => {
-    return matches.some(match => match.estado === 'en_juego' || Boolean(match.is_live));
+    return matches.some(isLiveMatch);
   }, [matches]);
 
   // Partidos cuya hora ya pasó pero el listado aún los marca pendiente → refrescar cada 15s para pillar el cambio a "en directo"
@@ -328,9 +328,7 @@ export default function MatchFeedScreen() {
   // Un partido cuenta como "En directo" SOLO si el backend lo confirma (estado en_juego / is_live).
   // El backend ingiere datos en vivo en tiempo real (WebSocket + livescore), así que este es el
   // origen de verdad; no marcamos LIVE por reloj para no mostrar partidos ya terminados.
-  const isMatchInLiveTab = useCallback((m: Match) =>
-    m.estado === 'en_juego' || Boolean(m.is_live),
-  []);
+  const isMatchInLiveTab = useCallback((m: Match) => isLiveMatch(m), []);
 
   // Filter by circuit (ALL, ATP, WTA, Challenger)
   const circuitFilteredMatches = useMemo(() => {
@@ -499,7 +497,7 @@ export default function MatchFeedScreen() {
 
             if (filteredTournamentMatches.length === 0) return null;
 
-            const hasLiveMatches = filteredTournamentMatches.some(m => m.estado === 'en_juego');
+            const hasLiveMatches = filteredTournamentMatches.some(isLiveMatch);
 
             const firstMatch = filteredTournamentMatches[0];
             const tournamentId = firstMatch?.tournament_key != null ? String(firstMatch.tournament_key) : null;

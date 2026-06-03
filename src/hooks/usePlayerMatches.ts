@@ -36,7 +36,7 @@ export function usePlayerMatches(
                 const cacheKey = `player-matches-${playerKey}-${limit}-${surface || 'all'}`;
                 const matchesData = await fetchWithCache(
                     cacheKey,
-                    () => fetchPlayerMatches(playerKey, limit, surface),
+                    () => fetchPlayerMatches(playerKey as number, limit, surface),
                     playerCache
                 );
 

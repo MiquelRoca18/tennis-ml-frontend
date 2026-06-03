@@ -460,8 +460,8 @@ function PointsStats({ stats }: { stats: MatchStats }) {
                     v1={p1.net_points_won ?? 0}
                     v2={p2.net_points_won ?? 0}
                     format="fraction"
-                    t1={p1.net_points_total}
-                    t2={p2.net_points_total}
+                    t1={p1.net_points_total ?? undefined}
+                    t2={p2.net_points_total ?? undefined}
                 />
             )}
             {(p1.last_10_balls != null || p2.last_10_balls != null) && (

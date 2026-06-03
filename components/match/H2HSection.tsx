@@ -8,17 +8,20 @@ interface H2HSectionProps {
     h2h: H2HData;
     player1Name: string;
     player2Name: string;
+    // Keys para atribuir el ganador (el backend devuelve winner_key, no el nombre).
+    player1Key?: number | null;
+    player2Key?: number | null;
 }
 
 type SurfaceFilter = 'ALL' | 'HARD' | 'CLAY' | 'GRASS';
 
-export default function H2HSection({ h2h, player1Name, player2Name }: H2HSectionProps) {
+export default function H2HSection({ h2h, player1Name, player2Name, player1Key, player2Key }: H2HSectionProps) {
     const [selectedSurface, setSelectedSurface] = useState<SurfaceFilter>('ALL');
 
     // Filter matches by surface
     const filteredMatches = selectedSurface === 'ALL'
-        ? h2h.last_meetings
-        : h2h.last_meetings.filter(match =>
+        ? h2h.last_matches
+        : h2h.last_matches.filter(match =>
             match.surface?.toUpperCase() === selectedSurface
         );
 
@@ -32,19 +35,19 @@ export default function H2HSection({ h2h, player1Name, player2Name }: H2HSection
             };
         }
 
-        const surfaceMatches = h2h.last_meetings.filter(match =>
+        const surfaceMatches = h2h.last_matches.filter(match =>
             match.surface?.toUpperCase() === selectedSurface
         );
 
-        const player1Wins = surfaceMatches.filter(match => match.winner === player1Name).length;
-        const player2Wins = surfaceMatches.filter(match => match.winner === player2Name).length;
+        const player1Wins = surfaceMatches.filter(match => match.winner_key === player1Key).length;
+        const player2Wins = surfaceMatches.filter(match => match.winner_key === player2Key).length;
 
         return {
             player1Wins,
             player2Wins,
             totalMatches: surfaceMatches.length,
         };
-    }, [selectedSurface, h2h, player1Name, player2Name]);
+    }, [selectedSurface, h2h, player1Key, player2Key]);
 
     const surfaceFilters: { label: string; value: SurfaceFilter; emoji: string }[] = [
         { label: 'TODAS', value: 'ALL', emoji: '🎾' },
@@ -140,12 +143,12 @@ export default function H2HSection({ h2h, player1Name, player2Name }: H2HSection
             {filteredMatches.length > 0 ? (
                 <View style={styles.matchesList}>
                     {filteredMatches.map((match, index) => {
-                        const isPlayer1Winner = match.winner === player1Name;
+                        const isPlayer1Winner = match.winner_key === player1Key;
                         return (
                             <View key={index} style={styles.matchRow}>
                                 <View style={styles.matchDate}>
                                     <Text style={styles.matchDateText}>
-                                        {parseLocalDate(match.date).toLocaleDateString('es-ES', {
+                                        {parseLocalDate(match.match_date).toLocaleDateString('es-ES', {
                                             day: '2-digit',
                                             month: '2-digit',
                                             year: '2-digit',
@@ -154,7 +157,7 @@ export default function H2HSection({ h2h, player1Name, player2Name }: H2HSection
                                 </View>
                                 <View style={styles.matchInfo}>
                                     <Text style={styles.matchTournament} numberOfLines={1}>
-                                        {match.tournament}
+                                        {match.tournament_name}
                                     </Text>
                                     {match.surface && (
                                         <View style={[styles.surfaceBadge, { backgroundColor: getSurfaceColor(match.surface) }]}>
@@ -173,8 +176,8 @@ export default function H2HSection({ h2h, player1Name, player2Name }: H2HSection
                                             {isPlayer1Winner ? 'G' : 'P'}
                                         </Text>
                                     </View>
-                                    {match.score && (
-                                        <Text style={styles.matchScore}>{match.score}</Text>
+                                    {match.final_result && (
+                                        <Text style={styles.matchScore}>{match.final_result}</Text>
                                     )}
                                 </View>
                             </View>

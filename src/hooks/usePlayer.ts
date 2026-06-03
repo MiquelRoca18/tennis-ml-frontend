@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { fetchPlayer } from '../services/api/playerService';
-import { Player } from '../types/api';
+import { PlayerProfile } from '../types/api';
 import { fetchWithCache, playerCache } from '../utils/cache';
 
 /**
@@ -9,7 +9,7 @@ import { fetchWithCache, playerCache } from '../utils/cache';
  * @returns Object with player data, loading state, and error
  */
 export function usePlayer(playerKey: number | null) {
-    const [player, setPlayer] = useState<Player | null>(null);
+    const [player, setPlayer] = useState<PlayerProfile | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
 
@@ -19,6 +19,7 @@ export function usePlayer(playerKey: number | null) {
             setLoading(false);
             return;
         }
+        const key: number = playerKey;
 
         let cancelled = false;
 
@@ -28,8 +29,8 @@ export function usePlayer(playerKey: number | null) {
                 setError(null);
 
                 const data = await fetchWithCache(
-                    `player-${playerKey}`,
-                    () => fetchPlayer(playerKey),
+                    `player-${key}`,
+                    () => fetchPlayer(key),
                     playerCache
                 );
 

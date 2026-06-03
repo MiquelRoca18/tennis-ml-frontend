@@ -36,7 +36,8 @@ export default function StatusFilterTabs({
       >
         {TABS.map((tab) => {
           const isActive = selectedFilter === tab.key;
-          const count = counts[tab.key];
+          // counts usa la clave 'all' (minúscula); el tab usa 'ALL'.
+          const count = counts[tab.key === 'ALL' ? 'all' : tab.key];
 
           return (
             <TouchableOpacity

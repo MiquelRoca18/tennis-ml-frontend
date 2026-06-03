@@ -30,7 +30,7 @@ export function usePlayerUpcoming(playerKey: number | null, days = 14) {
                 const cacheKey = `player-upcoming-${playerKey}-${days}`;
                 const upcomingData = await fetchWithCache(
                     cacheKey,
-                    () => fetchPlayerUpcoming(playerKey, days),
+                    () => fetchPlayerUpcoming(playerKey as number, days),
                     upcomingCache
                 );
 

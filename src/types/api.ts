@@ -23,6 +23,8 @@ export interface Player {
     ranking: number | null;
     cuota: number;
     logo: string;             // 🆕 URL del logo del jugador
+    pais?: string;            // Country code (ISO 3166-1)
+    seed?: number;            // Tournament seed number
 }
 
 export interface Prediction {
@@ -211,7 +213,7 @@ export interface MatchHistoryResponse {
     }>;
 }
 
-export interface StatsSummaryResponse {
+export interface BettingStatsSummaryResponse {
     periodo: string;
     fecha_inicio: string;
     fecha_fin: string;
@@ -347,7 +349,7 @@ export interface MatchAnalysisResponse extends MatchDetailsResponse {
 // ============================================
 
 // Player Types (profile from GET /players/:key - backend returns DB columns + API-Tennis stats/tournaments)
-export interface Player {
+export interface PlayerProfile {
     player_key: number | string;
     player_name: string;
     player_full_name?: string | null;
@@ -568,7 +570,7 @@ export interface OddsComparisonResponse {
 }
 
 // Point-by-Point Enhanced Types
-export interface BreakPointsResponse {
+export interface BreakPointsDetailResponse {
     match_id: number;
     player1_break_points: {
         opportunities: number;
@@ -628,15 +630,6 @@ export interface SetData {
     games_player2: number;
 }
 
-export interface Player {
-    nombre: string;
-    cuota: number;
-    logo: string;
-    ranking: number | null;
-    key: string;
-    pais?: string;        // Country code (ISO 3166-1 alpha-2 or alpha-3)
-    seed?: number;        // Tournament seed number
-}
 export interface GameData {
     id: number;
     match_id: number;

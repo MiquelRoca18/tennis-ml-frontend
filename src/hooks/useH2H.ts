@@ -23,6 +23,8 @@ export function useH2H(
             setLoading(false);
             return;
         }
+        const k1: number = player1Key;
+        const k2: number = player2Key;
 
         let cancelled = false;
 
@@ -32,12 +34,12 @@ export function useH2H(
                 setError(null);
 
                 // Sort keys to ensure consistent cache key regardless of order
-                const sortedKeys = [player1Key, player2Key].sort((a, b) => a - b);
+                const sortedKeys = [k1, k2].sort((a, b) => a - b);
                 const cacheKey = `h2h-${sortedKeys[0]}-${sortedKeys[1]}`;
 
                 const h2hData = await fetchWithCache(
                     cacheKey,
-                    () => fetchH2H(player1Key, player2Key),
+                    () => fetchH2H(k1, k2),
                     h2hCache
                 );
 

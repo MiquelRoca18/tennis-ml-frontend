@@ -1,11 +1,11 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Player } from '../../src/types/api';
+import { PlayerProfile } from '../../src/types/api';
 import { COLORS } from '../../src/utils/constants';
 import PlayerLogo from '../match/PlayerLogo';
 
 interface PlayerHeaderProps {
-    player: Player;
+    player: PlayerProfile;
 }
 
 /** Formatea player_bday tipo "11.02.1996" a "11 feb 1996" */
@@ -74,7 +74,7 @@ export default function PlayerHeader({ player }: PlayerHeaderProps) {
             {/* Birthday */}
             {(player.player_bday || player.player_birthday) ? (
                 <Text style={styles.birthday}>
-                    Nacimiento: {formatBirthday(player.player_bday || player.player_birthday)}
+                    Nacimiento: {formatBirthday((player.player_bday || player.player_birthday) as string)}
                 </Text>
             ) : null}
 

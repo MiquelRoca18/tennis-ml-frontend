@@ -1,5 +1,5 @@
 import { getCachedMatches, setCachedMatches, clearMatchesCache } from '../matchesCache';
-import type { MatchesResponse } from '../../types/api';
+import type { MatchesResponse } from '../../../types/api';
 
 // Minimal valid MatchesResponse factory
 function makeResponse(fecha = '2026-04-15'): MatchesResponse {

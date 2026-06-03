@@ -1,13 +1,13 @@
-import { Player, PlayerMatchesResponse, PlayerStatsResponse, PlayerUpcomingResponse } from '../../types/api';
+import { PlayerProfile, PlayerMatchesResponse, PlayerStatsResponse, PlayerUpcomingResponse } from '../../types/api';
 import apiClient from './apiClient';
 
-/** Normalize backend player response (DB columns: country, atp_points) to Player shape */
-function normalizePlayer(data: Record<string, unknown>): Player {
+/** Normalize backend player response (DB columns: country, atp_points) to PlayerProfile shape */
+function normalizePlayer(data: Record<string, unknown>): PlayerProfile {
     return {
         ...data,
         player_country: (data.player_country ?? data.country) as string | null,
         ranking_points: (data.ranking_points ?? data.atp_points ?? data.wta_points) as number | null,
-    } as Player;
+    } as PlayerProfile;
 }
 
 /**
@@ -15,7 +15,7 @@ function normalizePlayer(data: Record<string, unknown>): Player {
  * @param playerKey - Player ID
  * @returns Promise with player data
  */
-export const fetchPlayer = async (playerKey: number): Promise<Player> => {
+export const fetchPlayer = async (playerKey: number): Promise<PlayerProfile> => {
     const response = await apiClient.get<Record<string, unknown>>(`/players/${playerKey}`);
     return normalizePlayer(response.data);
 };
@@ -60,7 +60,7 @@ export const fetchPlayerMatches = async (
         return response.data;
     } catch {
         // 500 u otro error: no romper el perfil, devolver lista vacía
-        return { matches: [], total_matches: 0 };
+        return { player_key: playerKey, matches: [], total_matches: 0 };
     }
 };
 

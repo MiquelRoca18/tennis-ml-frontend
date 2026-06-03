@@ -72,8 +72,8 @@ const errorStyles = StyleSheet.create({
     justifyContent: 'center',
   },
   title: { fontSize: 18, fontWeight: '700', color: '#FF4444', marginBottom: 8 },
-  message: { fontSize: 14, color: Colors.textSecondary, marginBottom: 16 },
-  stack: { fontSize: 11, color: Colors.textSecondary, fontFamily: 'monospace' },
+  message: { fontSize: 14, color: Colors.text.secondary, marginBottom: 16 },
+  stack: { fontSize: 11, color: Colors.text.secondary, fontFamily: 'monospace' },
 });
 
 const CustomDarkTheme = {

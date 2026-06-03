@@ -7,7 +7,6 @@ import { fetchPlayerLookup } from '../../src/services/api/playerService';
 import { Match } from '../../src/types/api';
 import { COLORS, EV_THRESHOLD_BET, EV_THRESHOLD_MARGINAL } from '../../src/utils/constants';
 import { formatSeed, getCountryFlagSafe } from '../../src/utils/countryUtils';
-import { isMatchStarted } from '../../src/utils/dateUtils';
 import { formatMatchStatus, formatMatchTime, formatOdds, formatPercentage, formatProbability } from '../../src/utils/formatters';
 import CompletedMatchScore from './CompletedMatchScore';
 import LiveBadge from './LiveBadge';
@@ -28,12 +27,13 @@ function MatchCardBase({ match, onPress, onFavoriteRemoved }: MatchCardProps) {
     const { favorited, loading: favLoading, toggle } = useIsFavorite(match.id);
 
     const isCompleted = estado === 'completado';
-    // En vivo con datos de la API: backend dice en_juego/is_live
+    // LIVE solo si el backend lo confirma (en_juego / is_live). NO usamos el reloj:
+    // un partido pendiente cuya hora ya pasó (retraso, lag del backend) NO debe ocultar
+    // su recomendación. Así la APOSTAR no "desaparece" antes de que el partido empiece
+    // de verdad. Cuando el backend lo mueva a en_juego/completado, la card mostrará el score.
     const backendSaysLive = estado === 'en_juego' || Boolean(is_live);
-    const hasStarted = isMatchStarted(fecha_partido, hora_inicio);
-    const actuallyLive = backendSaysLive && (hasStarted || is_live === true);
-    // En la card mostramos LIVE si tenemos datos en directo O si ya empezó y no está terminado (sin datos API → en detalle se verá "Solo Resultado Final")
-    const showLiveOnCard = actuallyLive || (hasStarted && !isCompleted);
+    const actuallyLive = backendSaysLive;
+    const showLiveOnCard = backendSaysLive;
 
     const matchStatus = formatMatchStatus(estado);
     const hasPrediction = prediccion != null && typeof prediccion === 'object' && prediccion.jugador1_probabilidad != null;

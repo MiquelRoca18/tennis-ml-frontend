@@ -183,14 +183,19 @@ export default function MatchFeedScreen() {
   // Generate date range for selector (7 days before and after today)
   const dateRange = useMemo(() => getDateRange(7, 7), []);
 
-  const cancelledRef = useRef(false);
+  // Fecha seleccionada más reciente. Cualquier respuesta que llegue para una fecha
+  // distinta a esta se descarta (evita que la lista "salte" al día de hoy cuando una
+  // petición lenta de hoy resuelve después de que el usuario ya cambió de día).
+  const selectedDateRef = useRef(selectedDate);
 
-  const loadMatches = useCallback(async (date: string, forceNetwork = false, getIsCancelled?: () => boolean) => {
+  const loadMatches = useCallback(async (date: string, forceNetwork = false) => {
+    // Una respuesta es obsoleta si el usuario ya cambió a otra fecha mientras llegaba.
+    const isStale = () => selectedDateRef.current !== date;
     const cached = !forceNetwork ? getCachedMatches(date) : null;
     if (cached) {
       if (__DEV__) console.log(`[Feed] ${date} - CACHE HIT, showing immediately`);
       queueMicrotask(() => {
-        if (getIsCancelled?.()) return;
+        if (isStale()) return;
         dispatch({
           type: 'CACHE_HIT',
           payload: {
@@ -202,8 +207,8 @@ export default function MatchFeedScreen() {
       });
       fetchMatches(date)
         .then((response) => {
-          if (getIsCancelled?.()) return;
-          setCachedMatches(date, response);
+          setCachedMatches(date, response); // cachear siempre, aunque ya no se muestre
+          if (isStale()) return;
           dispatch({
             type: 'FETCH_SUCCESS',
             payload: {
@@ -228,6 +233,8 @@ export default function MatchFeedScreen() {
         console.timeEnd(`[Feed] ${date}`);
         console.log(`[Feed] ${date} - done, ${response.partidos?.length ?? 0} partidos`);
       }
+      setCachedMatches(date, response); // cachear siempre
+      if (isStale()) return;
       dispatch({
         type: 'FETCH_SUCCESS',
         payload: {
@@ -236,12 +243,11 @@ export default function MatchFeedScreen() {
           betting_config: response.betting_config ?? undefined,
         },
       });
-      setCachedMatches(date, response);
       // Revalidar en segundo plano con datos en directo para actualizar estados/marcadores
       fetchMatches(date)
         .then((full) => {
-          if (getIsCancelled?.()) return;
-          setCachedMatches(date, full);
+          setCachedMatches(date, full); // cachear siempre
+          if (isStale()) return;
           dispatch({
             type: 'FETCH_SUCCESS',
             payload: {
@@ -254,17 +260,16 @@ export default function MatchFeedScreen() {
         .catch(() => {});
     } catch (err: any) {
       if (__DEV__) console.timeEnd(`[Feed] ${date}`);
+      if (isStale()) return;
       dispatch({ type: 'FETCH_ERROR', payload: err?.message || 'Error al cargar los partidos' });
     }
   }, []);
 
-  // Initial load: marcar como no cancelado y pasar getIsCancelled para ignorar respuestas si el usuario cambió de fecha
+  // Carga al cambiar de fecha. Actualizamos la ref ANTES de cargar para que cualquier
+  // respuesta en vuelo de la fecha anterior se descarte al resolver.
   useEffect(() => {
-    cancelledRef.current = false;
-    loadMatches(selectedDate, false, () => cancelledRef.current);
-    return () => {
-      cancelledRef.current = true;
-    };
+    selectedDateRef.current = selectedDate;
+    loadMatches(selectedDate, false);
   }, [selectedDate, loadMatches]);
 
   // Pull to refresh

@@ -25,6 +25,7 @@ import { ThemeProvider } from '@/contexts/ThemeContext';
 import LiquidationOnAppOpen from '@/components/LiquidationOnAppOpen';
 import { AuthProvider } from '@/src/contexts/AuthContext';
 import { BankrollProvider } from '@/src/contexts/BankrollContext';
+import { DialogProvider } from '@/src/contexts/DialogContext';
 
 // En web, desactivar native screens para evitar bloqueos de eventos/touch
 enableScreens(false);
@@ -129,7 +130,7 @@ export default function RootLayout() {
     <View style={{ flex: 1 }} pointerEvents="box-none" collapsable={false}>
       <AuthProvider>
         <BankrollProvider>
-          <>
+          <DialogProvider>
             <LiquidationOnAppOpen />
             <ThemeProvider>
               <NavigationThemeProvider value={CustomDarkTheme}>
@@ -165,7 +166,7 @@ export default function RootLayout() {
                 <StatusBar style="light" />
               </NavigationThemeProvider>
             </ThemeProvider>
-          </>
+          </DialogProvider>
         </BankrollProvider>
       </AuthProvider>
     </View>

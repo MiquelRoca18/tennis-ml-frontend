@@ -5,7 +5,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   ScrollView,
   StyleSheet,
@@ -15,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import { useAuth } from '../../src/contexts/AuthContext';
+import { useDialog } from '../../src/contexts/DialogContext';
 import { addBet, type BetInput } from '../../src/services/betsService';
 import { fetchMatchOddsDetailed, type DetailedOddsResponse } from '../../src/services/api/matchDetailService';
 import { COLORS } from '../../src/utils/constants';
@@ -71,6 +71,7 @@ export default function RegisterBetModal({
   preloadedOdds,
 }: RegisterBetModalProps) {
   const { user } = useAuth();
+  const { confirm, notify } = useDialog();
   const [oddsData, setOddsData] = useState<DetailedOddsResponse | null>(preloadedOdds ? {
     success: true,
     player1_name: player1Name,
@@ -181,69 +182,65 @@ export default function RegisterBetModal({
 
   const handleSubmit = useCallback(async () => {
     if (amount <= 0) {
-      Alert.alert('Error', 'Introduce una cantidad válida.');
+      await notify('Error', 'Introduce una cantidad válida.');
       return;
     }
     if (amount > bankrollEur) {
-      Alert.alert('Error', `Bankroll insuficiente (tienes ${bankrollEur.toFixed(0)}€).`);
+      await notify('Error', `Bankroll insuficiente (tienes ${bankrollEur.toFixed(0)}€).`);
       return;
     }
     if (odds < 1) {
-      Alert.alert('Error', 'La cuota debe ser al menos 1.00.');
+      await notify('Error', 'La cuota debe ser al menos 1.00.');
       return;
     }
     if (!selectedBookmaker?.bookmaker) {
-      Alert.alert('Error', 'Selecciona una casa de apuestas.');
+      await notify('Error', 'Selecciona una casa de apuestas.');
       return;
     }
 
-    Alert.alert(
-      'Registrar apuesta',
-      `¿Registrar apuesta de ${amount.toFixed(2)}€ a ${recommendedName} @ ${odds.toFixed(2)} en ${selectedBookmaker.bookmaker}?\nSe restará del bankroll (${bankrollEur.toFixed(0)}€ → ${(bankrollEur - amount).toFixed(0)}€).`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Apostar',
-          onPress: async () => {
-            setSubmitting(true);
-            try {
-              const input: BetInput = {
-                matchId,
-                stakeEur: amount,
-                player1Name,
-                player2Name,
-                tournament,
-                bookmaker: selectedBookmaker.bookmaker,
-                odds,
-                pickedPlayer: recommendedName,
-                potentialWin,
-                status: 'activa',
-              };
-              const result = await addBet(input, user?.id, undefined, bankrollEur);
-              if (!result.success) {
-                Alert.alert('Error', result.error ?? 'No se pudo registrar la apuesta');
-                return;
-              }
-              if (result.bankrollAfter != null) {
-                await onBankrollUpdated?.(result.bankrollAfter);
-              }
-              onSuccess?.();
-              onClose();
-              Alert.alert(
-                'Apuesta registrada',
-                result.bankrollAfter != null
-                  ? `Bankroll actualizado: ${result.bankrollAfter.toFixed(0)}€`
-                  : 'Apuesta guardada.'
-              );
-            } catch (e: any) {
-              Alert.alert('Error', e.message || 'No se pudo registrar la apuesta');
-            } finally {
-              setSubmitting(false);
-            }
-          },
-        },
-      ]
-    );
+    const ok = await confirm({
+      title: 'Registrar apuesta',
+      message: `¿Registrar apuesta de ${amount.toFixed(2)}€ a ${recommendedName} @ ${odds.toFixed(2)} en ${selectedBookmaker.bookmaker}?\nSe restará del bankroll (${bankrollEur.toFixed(0)}€ → ${(bankrollEur - amount).toFixed(0)}€).`,
+      confirmText: 'Apostar',
+      cancelText: 'Cancelar',
+    });
+    if (!ok) return;
+
+    setSubmitting(true);
+    try {
+      const input: BetInput = {
+        matchId,
+        stakeEur: amount,
+        player1Name,
+        player2Name,
+        tournament,
+        bookmaker: selectedBookmaker.bookmaker,
+        odds,
+        pickedPlayer: recommendedName,
+        potentialWin,
+        status: 'activa',
+      };
+      const result = await addBet(input, user?.id, undefined, bankrollEur);
+      if (!result.success) {
+        await notify('Error', result.error ?? 'No se pudo registrar la apuesta');
+        return;
+      }
+      if (result.bankrollAfter != null) {
+        await onBankrollUpdated?.(result.bankrollAfter);
+      }
+      onSuccess?.();
+      onClose();
+      await notify(
+        'Apuesta registrada',
+        result.bankrollAfter != null
+          ? `Bankroll actualizado: ${result.bankrollAfter.toFixed(0)}€`
+          : 'Apuesta guardada.'
+      );
+    } catch (e: any) {
+      await notify('Error', e.message || 'No se pudo registrar la apuesta');
+    } finally {
+      setSubmitting(false);
+    }
   }, [
     amount,
     bankrollEur,
@@ -259,6 +256,8 @@ export default function RegisterBetModal({
     onSuccess,
     onBankrollUpdated,
     onClose,
+    confirm,
+    notify,
   ]);
 
   if (!visible) return null;

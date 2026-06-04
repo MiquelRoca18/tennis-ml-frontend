@@ -1,50 +1,42 @@
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import AuthButton from '../../components/auth/AuthButton';
 import { useAuth } from '../../src/contexts/AuthContext';
+import { useDialog } from '../../src/contexts/DialogContext';
 import { COLORS } from '../../src/utils/constants';
 
 export default function AccountScreen() {
   const router = useRouter();
   const { user, signOut, deleteAccount, isConfigured } = useAuth();
+  const { confirm, notify } = useDialog();
   const [deleting, setDeleting] = useState(false);
 
-  const handleDeleteAccount = () => {
-    Alert.alert(
-      '⚠️ Borrar cuenta',
-      'Se eliminarán todos tus datos (favoritos, apuestas, etc.). Esta acción no se puede deshacer.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Entendido, borrar',
-          style: 'destructive',
-          onPress: () => {
-            Alert.alert(
-              '¿Última confirmación?',
-              '¿Estás seguro de que quieres borrar tu cuenta permanentemente?',
-              [
-                { text: 'No, cancelar', style: 'cancel' },
-                {
-                  text: 'Sí, borrar mi cuenta',
-                  style: 'destructive',
-                  onPress: async () => {
-                    setDeleting(true);
-                    const { error } = await deleteAccount();
-                    setDeleting(false);
-                    if (error) {
-                      Alert.alert('Error', error.message);
-                    } else {
-                      router.replace('/(tabs)');
-                    }
-                  },
-                },
-              ]
-            );
-          },
-        },
-      ]
-    );
+  const handleDeleteAccount = async () => {
+    const first = await confirm({
+      title: '⚠️ Borrar cuenta',
+      message: 'Se eliminarán todos tus datos (favoritos, apuestas, etc.). Esta acción no se puede deshacer.',
+      confirmText: 'Entendido, borrar',
+      cancelText: 'Cancelar',
+      destructive: true,
+    });
+    if (!first) return;
+    const second = await confirm({
+      title: '¿Última confirmación?',
+      message: '¿Estás seguro de que quieres borrar tu cuenta permanentemente?',
+      confirmText: 'Sí, borrar mi cuenta',
+      cancelText: 'No, cancelar',
+      destructive: true,
+    });
+    if (!second) return;
+    setDeleting(true);
+    const { error } = await deleteAccount();
+    setDeleting(false);
+    if (error) {
+      await notify('Error', error.message);
+    } else {
+      router.replace('/(tabs)');
+    }
   };
 
   if (!isConfigured) {

@@ -2,7 +2,6 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   AppState,
   AppStateStatus,
   Pressable,
@@ -15,6 +14,7 @@ import {
 } from 'react-native';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useBankroll } from '../../src/contexts/BankrollContext';
+import { useDialog } from '../../src/contexts/DialogContext';
 import { getBets, invalidateBetsCache, removeBet, deleteBetsWithoutRefund } from '../../src/services/betsService';
 import type { Bet } from '../../src/services/betsService';
 import { fetchMatchesStatusBatch, fetchRefreshResultsBatch } from '../../src/services/api/matchService';
@@ -67,6 +67,7 @@ export default function BetsScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { bankroll: contextBankroll, saveBankroll } = useBankroll();
+  const { confirm, notify } = useDialog();
   const [bets, setBets] = useState<Bet[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -80,32 +81,27 @@ export default function BetsScreen() {
   const REFRESH_RESULTS_THROTTLE_MS = 5 * 60 * 1000;
 
   const handleDeleteBet = useCallback(
-    (bet: Bet) => {
-      Alert.alert(
-        'Cancelar apuesta',
-        `¿Cancelar esta apuesta de ${bet.stakeEur.toFixed(2)}€?\nSe devolverá esa cantidad al bankroll.`,
-        [
-          { text: 'No', style: 'cancel' },
-          {
-            text: 'Sí, cancelar',
-            style: 'destructive',
-            onPress: async () => {
-              setDeletingId(bet.id);
-              const result = await removeBet(bet, user?.id);
-              setDeletingId(null);
-              if (result.success) {
-                if (user && result.bankrollAfter != null) saveBankroll(result.bankrollAfter);
-                setBets((prev) => prev.filter((b) => b.id !== bet.id));
-                Alert.alert('Listo', `${bet.stakeEur.toFixed(2)}€ devueltos al bankroll.`);
-              } else {
-                Alert.alert('Error', result.error ?? 'No se pudo cancelar la apuesta');
-              }
-            },
-          },
-        ]
-      );
+    async (bet: Bet) => {
+      const ok = await confirm({
+        title: 'Cancelar apuesta',
+        message: `¿Cancelar esta apuesta de ${bet.stakeEur.toFixed(2)}€?\nSe devolverá esa cantidad al bankroll.`,
+        confirmText: 'Sí, cancelar',
+        cancelText: 'No',
+        destructive: true,
+      });
+      if (!ok) return;
+      setDeletingId(bet.id);
+      const result = await removeBet(bet, user?.id);
+      setDeletingId(null);
+      if (result.success) {
+        if (user && result.bankrollAfter != null) saveBankroll(result.bankrollAfter);
+        setBets((prev) => prev.filter((b) => b.id !== bet.id));
+        await notify('Listo', `${bet.stakeEur.toFixed(2)}€ devueltos al bankroll.`);
+      } else {
+        await notify('Error', result.error ?? 'No se pudo cancelar la apuesta');
+      }
     },
-    [user?.id, saveBankroll]
+    [user, saveBankroll, confirm, notify]
   );
 
   const loadBets = useCallback(async (forceRefresh = false) => {

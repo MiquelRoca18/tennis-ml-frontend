@@ -1,8 +1,9 @@
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import FavoriteButton from '../ui/FavoriteButton';
 import { FAVORITE_REQUIRES_LOGIN, useIsFavorite } from '../../src/hooks/useFavorites';
+import { useDialog } from '../../src/contexts/DialogContext';
 import { fetchPlayerLookup } from '../../src/services/api/playerService';
 import { Match } from '../../src/types/api';
 import { COLORS, EV_THRESHOLD_BET, EV_THRESHOLD_MARGINAL } from '../../src/utils/constants';
@@ -25,6 +26,7 @@ function MatchCardBase({ match, onPress, onFavoriteRemoved }: MatchCardProps) {
     const router = useRouter();
     const { jugador1, jugador2, prediccion, estado, hora_inicio, is_live, resultado, fecha_partido, event_status } = match;
     const { favorited, loading: favLoading, toggle } = useIsFavorite(match.id);
+    const { notify } = useDialog();
 
     const isCompleted = estado === 'completado';
     // LIVE solo si el backend lo confirma (en_juego / is_live). NO usamos el reloj:
@@ -110,7 +112,7 @@ function MatchCardBase({ match, onPress, onFavoriteRemoved }: MatchCardProps) {
             return;
         }
         if (!playerName || !playerName.trim()) {
-            Alert.alert('Perfil no disponible', 'No se puede abrir el perfil de este jugador.');
+            await notify('Perfil no disponible', 'No se puede abrir el perfil de este jugador.');
             return;
         }
         try {
@@ -118,10 +120,10 @@ function MatchCardBase({ match, onPress, onFavoriteRemoved }: MatchCardProps) {
             if (resolvedKey != null) {
                 router.push({ pathname: '/player/[key]', params: { key: String(resolvedKey) } } as any);
             } else {
-                Alert.alert('Perfil no encontrado', 'No se encontró el perfil de este jugador.');
+                await notify('Perfil no encontrado', 'No se encontró el perfil de este jugador.');
             }
         } catch {
-            Alert.alert('Error', 'No se pudo cargar el perfil. Intenta de nuevo.');
+            await notify('Error', 'No se pudo cargar el perfil. Intenta de nuevo.');
         }
     };
 

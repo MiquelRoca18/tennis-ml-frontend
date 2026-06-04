@@ -3,7 +3,6 @@ import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,12 +12,14 @@ import {
 } from 'react-native';
 import { useAuth } from '../src/contexts/AuthContext';
 import { useBankroll } from '../src/contexts/BankrollContext';
+import { useDialog } from '../src/contexts/DialogContext';
 import { fetchBettingSettings, updateBettingBankroll } from '../src/services/api/matchService';
 import { COLORS } from '../src/utils/constants';
 
 export default function SettingsScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { notify } = useDialog();
   const { bankroll: contextBankroll, loading: bankrollContextLoading, saveBankroll, refreshBankroll } = useBankroll();
   const [bankroll, setBankroll] = useState<string>('');
   const [bankrollLoading, setBankrollLoading] = useState(true);
@@ -58,7 +59,7 @@ export default function SettingsScreen() {
   const handleSaveBankroll = async () => {
     const value = parseFloat(bankroll.replace(',', '.'));
     if (Number.isNaN(value) || value < 0) {
-      Alert.alert('Valor inválido', 'Introduce un bankroll válido (número ≥ 0).');
+      await notify('Valor inválido', 'Introduce un bankroll válido (número ≥ 0).');
       return;
     }
     try {
@@ -66,14 +67,14 @@ export default function SettingsScreen() {
       if (user) {
         await saveBankroll(value);
         setBankroll(String(value));
-        Alert.alert('Guardado', 'Bankroll actualizado. Las cantidades sugeridas se recalcularán con este valor.');
+        await notify('Guardado', 'Bankroll actualizado. Las cantidades sugeridas se recalcularán con este valor.');
       } else {
         await updateBettingBankroll(value);
         setBankroll(String(value));
-        Alert.alert('Guardado', 'Bankroll actualizado. Inicia sesión para que quede guardado en tu cuenta.');
+        await notify('Guardado', 'Bankroll actualizado. Inicia sesión para que quede guardado en tu cuenta.');
       }
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'No se pudo guardar el bankroll.');
+      await notify('Error', e.message || 'No se pudo guardar el bankroll.');
     } finally {
       setBankrollSaving(false);
     }

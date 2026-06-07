@@ -48,6 +48,10 @@ export interface Prediction {
     confidence_score?: number;
     player1_known?: boolean;
     player2_known?: boolean;
+    // Estabilidad de la recomendación frente al refresh diario de ELO (solo si hay apuesta):
+    // 'estable' = puedes apostar; 'espera' = el ELO puede cambiar antes del inicio, reconfirma.
+    estabilidad?: 'estable' | 'espera' | null;
+    estabilidad_msg?: string | null;
 }
 
 // Score de un set individual (para marcador detallado)

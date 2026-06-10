@@ -52,6 +52,9 @@ export interface Prediction {
     // 'estable' = puedes apostar; 'espera' = el ELO puede cambiar antes del inicio, reconfirma.
     estabilidad?: 'estable' | 'espera' | null;
     estabilidad_msg?: string | null;
+    // apostable = recomendación ACTIVA y ESTABLE (segura para apostar ahora). Las que no
+    // (estabilidad='espera') se muestran como "en espera del refresh".
+    apostable?: boolean | null;
 }
 
 // Score de un set individual (para marcador detallado)

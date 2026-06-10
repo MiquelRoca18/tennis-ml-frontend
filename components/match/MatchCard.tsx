@@ -274,11 +274,12 @@ function MatchCardBase({ match, onPress, onFavoriteRemoved }: MatchCardProps) {
                                     </Text>
                                 </View>
                             )}
-                            {/* Estabilidad: avisa si el ELO puede recalcularse antes del inicio */}
+                            {/* Apostable: solo las estables+activas son seguras para apostar AHORA;
+                                las que esperan al refresh de ELO pueden cambiar antes del partido */}
                             {isApostar && prediccion.estabilidad && (
-                                <View style={[styles.apostaBadge, { backgroundColor: (prediccion.estabilidad === 'estable' ? COLORS.success : COLORS.warning) + '22' }]}>
-                                    <Text style={[styles.apostaBadgeText, { color: prediccion.estabilidad === 'estable' ? COLORS.success : COLORS.warning }]}>
-                                        {prediccion.estabilidad === 'estable' ? '✅ Estable — puedes apostar' : '⏳ Espera al inicio — el ELO puede cambiar'}
+                                <View style={[styles.apostaBadge, { backgroundColor: (prediccion.apostable ? COLORS.success : COLORS.warning) + '22' }]}>
+                                    <Text style={[styles.apostaBadgeText, { color: prediccion.apostable ? COLORS.success : COLORS.warning }]}>
+                                        {prediccion.apostable ? '✅ APOSTABLE AHORA' : '⏳ En espera del refresh (puede cambiar)'}
                                     </Text>
                                 </View>
                             )}

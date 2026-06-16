@@ -167,3 +167,26 @@ export const formatMatchStatus = (estado: MatchState): { emoji: string; text: st
             return { emoji: '❓', text: 'Desconocido', color: '#999999' };
     }
 };
+
+/**
+ * True si el partido fue ANULADO (cancelado/walkover/retiro antes de jugarse): consta como
+ * completado/cancelado pero SIN ganador. Mismo criterio que el backend ("anulada").
+ */
+export const isMatchAnulado = (m: {
+    estado?: string | null;
+    resultado?: { ganador?: string | null } | null;
+}): boolean => (m.estado === 'completado' || m.estado === 'cancelado') && !m.resultado?.ganador;
+
+/**
+ * Estado a mostrar de un partido concreto: igual que formatMatchStatus, pero muestra "Anulado"
+ * cuando el partido fue anulado (queda dentro de Finalizados, solo cambia la etiqueta).
+ */
+export const formatMatchStatusForMatch = (m: {
+    estado?: string | null;
+    resultado?: { ganador?: string | null } | null;
+}): { emoji: string; text: string; color: string } => {
+    if (isMatchAnulado(m)) {
+        return { emoji: '🚫', text: 'Anulado', color: '#999999' };
+    }
+    return formatMatchStatus((m.estado ?? 'pendiente') as MatchState);
+};

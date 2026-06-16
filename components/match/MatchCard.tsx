@@ -8,7 +8,7 @@ import { fetchPlayerLookup } from '../../src/services/api/playerService';
 import { Match } from '../../src/types/api';
 import { COLORS, EV_THRESHOLD_BET, EV_THRESHOLD_MARGINAL } from '../../src/utils/constants';
 import { formatSeed, getCountryFlagSafe } from '../../src/utils/countryUtils';
-import { formatMatchStatus, formatMatchTime, formatOdds, formatPercentage, formatProbability } from '../../src/utils/formatters';
+import { formatMatchStatusForMatch, formatMatchTime, formatOdds, formatPercentage, formatProbability } from '../../src/utils/formatters';
 import CompletedMatchScore from './CompletedMatchScore';
 import LiveBadge from './LiveBadge';
 import PlayerLogo from './PlayerLogo';
@@ -37,7 +37,9 @@ function MatchCardBase({ match, onPress, onFavoriteRemoved }: MatchCardProps) {
     const actuallyLive = backendSaysLive;
     const showLiveOnCard = backendSaysLive;
 
-    const matchStatus = formatMatchStatus(estado);
+    // Anulado (cancelado/walkover sin ganador): se queda dentro de Finalizados pero la etiqueta
+    // muestra "Anulado" en vez de "Finalizado".
+    const matchStatus = formatMatchStatusForMatch(match);
     const hasPrediction = prediccion != null && typeof prediccion === 'object' && prediccion.jugador1_probabilidad != null;
     const shouldShowPrediction = estado === 'pendiente' && !showLiveOnCard && hasPrediction;
 

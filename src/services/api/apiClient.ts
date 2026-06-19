@@ -1,4 +1,5 @@
 import axios, { AxiosError, AxiosInstance } from 'axios';
+import { supabase } from '../../lib/supabase';
 import { API_BASE_URL } from '../../utils/constants';
 
 // Create axios instance with default config
@@ -13,9 +14,20 @@ const apiClient: AxiosInstance = axios.create({
     },
 });
 
-// Request interceptor
+// Request interceptor: adjunta el access token de Supabase como Bearer.
+// El backend lo valida cuando AUTH_ENABLED=true; mientras esté en false es inofensivo.
 apiClient.interceptors.request.use(
-    (config) => {
+    async (config) => {
+        try {
+            const { data } = await supabase.auth.getSession();
+            const token = data.session?.access_token;
+            if (token) {
+                config.headers.Authorization = `Bearer ${token}`;
+            }
+        } catch {
+            // Sin sesión disponible → se envía sin token; el backend responderá 401
+            // si el endpoint lo requiere, y el response interceptor lo traduce.
+        }
         return config;
     },
     (error) => {
@@ -49,6 +61,10 @@ apiClient.interceptors.response.use(
         switch (error.response.status) {
             case 400:
                 throw new Error('Solicitud inválida. Verifica los datos enviados.');
+            case 401:
+                throw new Error('Sesión caducada. Vuelve a iniciar sesión.');
+            case 403:
+                throw new Error('No tienes acceso a este recurso.');
             case 404:
                 throw new Error('Recurso no encontrado.');
             case 500:

@@ -3,7 +3,6 @@
 export const API_BASE_URL = 'https://tennis-ml-predictor-production.up.railway.app';
 /** Base URL para fotos de jugadores (API-Tennis). Si logo_url viene solo como "12345_nombre.jpg", se resuelve aquí. */
 export const PLAYER_LOGO_BASE_URL = 'https://api.api-tennis.com/logo-tennis';
-export const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 // Colors - FlashScore Style
 export const COLORS = {
@@ -44,33 +43,6 @@ export const COLORS = {
   evNegative: '#FF4444',
 };
 
-// Tennis surfaces
-export const SURFACES = ['Hard', 'Clay', 'Grass', 'Carpet'] as const;
-
-// Confidence levels
-export const CONFIDENCE_LEVELS = ['Alta', 'Media', 'Baja'] as const;
-export const CONFIDENCE_LEVELS_NEW = ['HIGH', 'MEDIUM', 'LOW', 'UNKNOWN'] as const;
-
-// Confidence level descriptions
-export const CONFIDENCE_DESCRIPTIONS = {
-  HIGH: 'Ambos jugadores en datos históricos',
-  MEDIUM: 'Datos parciales disponibles',
-  LOW: 'Jugadores sin historial - NO apostar',
-  UNKNOWN: 'Nivel desconocido',
-  Alta: 'Alta confianza',
-  Media: 'Confianza media',
-  Baja: 'Baja confianza',
-};
-
-// Match states
-export const MATCH_STATES = ['pendiente', 'en_juego', 'completado', 'cancelado'] as const;
-
-// Stats periods
-export const STATS_PERIODS = ['7d', '30d', 'all'] as const;
-
 // EV thresholds
 export const EV_THRESHOLD_BET = 0.03; // 3%
 export const EV_THRESHOLD_MARGINAL = 0.0; // 0%
-
-// Kelly fraction default
-export const KELLY_FRACTION_DEFAULT = 0.25; // 25% Kelly

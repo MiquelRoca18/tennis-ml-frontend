@@ -93,9 +93,7 @@ export default function RootLayout() {
                 title: 'Configuración',
                 headerShown: false,
               }}
-            />
-            <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-          </Stack>
+            />          </Stack>
           <StatusBar style="light" />
         </NavigationThemeProvider>
         </DialogProvider>

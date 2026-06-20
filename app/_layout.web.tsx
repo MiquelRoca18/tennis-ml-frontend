@@ -20,8 +20,6 @@ import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { enableScreens } from 'react-native-screens';
 
-import { Colors } from '@/constants/Colors';
-import { ThemeProvider } from '@/contexts/ThemeContext';
 import LiquidationOnAppOpen from '@/components/LiquidationOnAppOpen';
 import { AuthProvider } from '@/src/contexts/AuthContext';
 import { BankrollProvider } from '@/src/contexts/BankrollContext';
@@ -68,25 +66,26 @@ class WebErrorBoundary extends Component<
 const errorStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background.primary,
+    backgroundColor: '#0A1929',
     padding: 24,
     justifyContent: 'center',
   },
   title: { fontSize: 18, fontWeight: '700', color: '#FF4444', marginBottom: 8 },
-  message: { fontSize: 14, color: Colors.text.secondary, marginBottom: 16 },
-  stack: { fontSize: 11, color: Colors.text.secondary, fontFamily: 'monospace' },
+  message: { fontSize: 14, color: '#B2BAC2', marginBottom: 16 },
+  stack: { fontSize: 11, color: '#B2BAC2', fontFamily: 'monospace' },
 });
 
+// Tema de navegación (chrome). Hex preservados tal cual para no alterar la apariencia.
 const CustomDarkTheme = {
   ...NavigationDarkTheme,
   colors: {
     ...NavigationDarkTheme.colors,
-    primary: Colors.brand.neonGreen,
-    background: Colors.background.primary,
-    card: Colors.background.secondary,
-    text: Colors.text.primary,
-    border: Colors.ui.border,
-    notification: Colors.brand.electricBlue,
+    primary: '#00FF88',
+    background: '#0A1929',
+    card: '#132F4C',
+    text: '#FFFFFF',
+    border: '#2D3843',
+    notification: '#D4A84B',
   },
 };
 
@@ -132,14 +131,13 @@ export default function RootLayout() {
         <BankrollProvider>
           <DialogProvider>
             <LiquidationOnAppOpen />
-            <ThemeProvider>
               <NavigationThemeProvider value={CustomDarkTheme}>
                 <Stack
                   screenOptions={{
-                    headerStyle: { backgroundColor: Colors.background.secondary },
-                    headerTintColor: Colors.text.primary,
+                    headerStyle: { backgroundColor: '#132F4C' },
+                    headerTintColor: '#FFFFFF',
                     headerTitleStyle: { fontFamily: 'Inter-Bold' },
-                    contentStyle: { backgroundColor: Colors.background.primary },
+                    contentStyle: { backgroundColor: '#0A1929' },
                   }}
                 >
                   <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -165,7 +163,6 @@ export default function RootLayout() {
                 </Stack>
                 <StatusBar style="light" />
               </NavigationThemeProvider>
-            </ThemeProvider>
           </DialogProvider>
         </BankrollProvider>
       </AuthProvider>

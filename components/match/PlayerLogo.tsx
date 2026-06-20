@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
-import { Colors } from '../../constants/Colors';
 import { PLAYER_LOGO_BASE_URL } from '../../src/utils/constants';
 
 /** Convierte una URL de logo relativa (ej. "13552_t-paris.jpg") en absoluta (API-Tennis). */
@@ -38,9 +37,9 @@ export default function PlayerLogo({ logo, logoUrl, name = '', size = 40, style 
     // Generate a consistent color based on name
     const getColorFromName = (playerName: string): string => {
         const colors = [
-            Colors.brand.neonGreen,
-            Colors.brand.electricBlue,
-            Colors.brand.gold,
+            '#00FF88', // verde neón
+            '#D4A84B', // dorado Tenly
+            '#FFD700', // oro
             '#FF6B9D', // Pink
             '#9D50BB', // Purple
             '#6BCF7F', // Light green
@@ -107,14 +106,14 @@ export default function PlayerLogo({ logo, logoUrl, name = '', size = 40, style 
 const styles = StyleSheet.create({
     container: {
         borderWidth: 2,
-        borderColor: Colors.ui.border,
+        borderColor: '#2D3843',
         overflow: 'hidden',
     },
     fallbackContainer: {
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 2,
-        borderColor: Colors.ui.border,
+        borderColor: '#2D3843',
     },
     initials: {
         color: '#0A1929',

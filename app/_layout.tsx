@@ -15,8 +15,6 @@ import { Platform, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 
-import { Colors } from '@/constants/Colors';
-import { ThemeProvider } from '@/contexts/ThemeContext';
 import LiquidationOnAppOpen from '@/components/LiquidationOnAppOpen';
 import { AuthProvider } from '@/src/contexts/AuthContext';
 import { BankrollProvider } from '@/src/contexts/BankrollContext';
@@ -24,17 +22,18 @@ import { DialogProvider } from '@/src/contexts/DialogContext';
 
 SplashScreen.preventAutoHideAsync();
 
-// Custom Navigation Theme
+// Tema de navegación (chrome de React Navigation). Estos hex se mantienen
+// exactamente como estaban para no alterar la apariencia de la app.
 const CustomDarkTheme = {
   ...NavigationDarkTheme,
   colors: {
     ...NavigationDarkTheme.colors,
-    primary: Colors.brand.neonGreen,
-    background: Colors.background.primary,
-    card: Colors.background.secondary,
-    text: Colors.text.primary,
-    border: Colors.ui.border,
-    notification: Colors.brand.electricBlue,
+    primary: '#00FF88', // verde neón (acento)
+    background: '#0A1929', // fondo del contenedor de navegación
+    card: '#132F4C',
+    text: '#FFFFFF',
+    border: '#2D3843',
+    notification: '#D4A84B', // dorado Tenly
   },
 };
 
@@ -67,14 +66,13 @@ export default function RootLayout() {
       <BankrollProvider>
         <DialogProvider>
           <LiquidationOnAppOpen />
-          <ThemeProvider>
         <NavigationThemeProvider value={CustomDarkTheme}>
           <Stack
             screenOptions={{
-              headerStyle: { backgroundColor: Colors.background.secondary },
-              headerTintColor: Colors.text.primary,
+              headerStyle: { backgroundColor: '#132F4C' },
+              headerTintColor: '#FFFFFF',
               headerTitleStyle: { fontFamily: 'Inter-Bold' },
-              contentStyle: { backgroundColor: Colors.background.primary },
+              contentStyle: { backgroundColor: '#0A1929' },
             }}
           >
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -100,7 +98,6 @@ export default function RootLayout() {
           </Stack>
           <StatusBar style="light" />
         </NavigationThemeProvider>
-          </ThemeProvider>
         </DialogProvider>
       </BankrollProvider>
     </AuthProvider>

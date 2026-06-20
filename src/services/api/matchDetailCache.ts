@@ -27,8 +27,3 @@ export function getCachedMatchDetail(matchId: number): MatchFullResponse | null 
 export function setCachedMatchDetail(matchId: number, data: MatchFullResponse): void {
   cache.set(matchId, { data, ts: Date.now() });
 }
-
-/** Limpia la caché (tests o al cerrar sesión). */
-export function clearMatchDetailCache(): void {
-  cache.clear();
-}

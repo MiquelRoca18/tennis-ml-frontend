@@ -2,31 +2,6 @@ import { MatchState } from '../types/api';
 import { parseLocalDate } from './dateUtils';
 
 /**
- * Format date to Spanish locale
- * @param dateString - Date in YYYY-MM-DD format
- * @returns Formatted date (e.g., "12 Ene 2026")
- */
-export const formatDate = (dateString: string): string => {
-    const date = parseLocalDate(dateString);
-    const options: Intl.DateTimeFormatOptions = {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-    };
-    return date.toLocaleDateString('es-ES', options);
-};
-
-/**
- * Format time
- * @param timeString - Time in HH:MM format
- * @returns Formatted time (e.g., "14:00")
- */
-export const formatTime = (timeString: string | null): string => {
-    if (!timeString) return 'TBD';
-    return timeString;
-};
-
-/**
  * Format match time with date context
  * @param fecha - Date in YYYY-MM-DD format
  * @param hora - Time in HH:MM format
@@ -59,7 +34,6 @@ export const formatMatchTime = (fecha: string, hora: string | null): string => {
     return `${dateStr} ${timeWithoutSeconds}`;
 };
 
-
 /**
  * Format percentage with sign
  * @param value - Decimal value (e.g., 0.052 for 5.2%)
@@ -90,52 +64,6 @@ export const formatProbability = (value: number | null | undefined): string => {
  */
 export const formatOdds = (odds: number): string => {
     return odds.toFixed(2);
-};
-
-/**
- * Format currency (Euro)
- * @param amount - Amount in euros
- * @returns Formatted currency (e.g., "€10.50")
- */
-export const formatCurrency = (amount: number): string => {
-    return `€${amount.toFixed(2)}`;
-};
-
-/**
- * Get relative date string
- * @param dateString - Date in YYYY-MM-DD format
- * @returns "Hoy", "Mañana", "Ayer", or formatted date
- */
-export const getRelativeDate = (dateString: string): string => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const date = parseLocalDate(dateString);
-    date.setHours(0, 0, 0, 0);
-
-    const diffTime = date.getTime() - today.getTime();
-    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-
-    if (diffDays === 0) return 'Hoy';
-    if (diffDays === 1) return 'Mañana';
-    if (diffDays === -1) return 'Ayer';
-
-    return formatDate(dateString);
-};
-
-/**
- * Format match state to Spanish
- * @param estado - Match state
- * @returns Spanish translation
- */
-export const formatMatchState = (estado: string): string => {
-    const states: Record<string, string> = {
-        pendiente: 'Pendiente',
-        en_juego: 'En Juego',
-        completado: 'Finalizado',
-        cancelado: 'Cancelado',
-    };
-    return states[estado] || estado;
 };
 
 /**

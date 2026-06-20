@@ -1,4 +1,4 @@
-import { Match, Tournament, TournamentMatchesResponse, TournamentsResponse } from '../../types/api';
+import { Match, TournamentMatchesResponse, TournamentsResponse } from '../../types/api';
 import apiClient from './apiClient';
 
 /** Formato plano que devuelve el backend (SELECT * FROM matches) */
@@ -87,16 +87,6 @@ export const fetchTournaments = async (eventType?: string): Promise<TournamentsR
 };
 
 /**
- * Fetch tournament details
- * @param tournamentKey - Tournament ID
- * @returns Promise with tournament data
- */
-export const fetchTournament = async (tournamentKey: number): Promise<Tournament> => {
-    const response = await apiClient.get<Tournament>(`/tournaments/${tournamentKey}`);
-    return response.data;
-};
-
-/**
  * Fetch matches for a specific tournament
  * El backend puede devolver matches en formato enriquecido (jugador1/jugador2/prediccion anidados)
  * o en formato plano; normalizamos solo si es plano.
@@ -130,16 +120,4 @@ export const fetchTournamentMatches = async (
         total_matches: raw.total_matches ?? matches.length,
         matches,
     };
-};
-
-/**
- * Sync tournaments from API (admin only)
- * @returns Promise with sync result
- */
-export const syncTournaments = async (): Promise<{
-    success: boolean;
-    total_synced: number;
-}> => {
-    const response = await apiClient.post('/tournaments/sync');
-    return response.data;
 };

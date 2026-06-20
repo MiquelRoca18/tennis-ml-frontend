@@ -7,7 +7,7 @@
  * Soporta ?live=false para primera carga rápida (sin enriquecimiento con API externa).
  */
 
-import { MatchFullResponse, MatchTimeline, PointByPointData } from '../../types/matchDetail';
+import { MatchFullResponse } from '../../types/matchDetail';
 import apiClient from './apiClient';
 import { setCachedMatchDetail } from './matchDetailCache';
 
@@ -61,33 +61,6 @@ export const prefetchMatchFull = (matchId: number): void => {
 };
 
 /**
- * Obtiene el timeline de juegos del partido.
- * 
- * @param matchId - ID del partido
- * @returns Timeline con juegos agrupados por set
- */
-export const fetchMatchTimeline = async (matchId: number): Promise<MatchTimeline> => {
-    const response = await apiClient.get<MatchTimeline>(`/matches/${matchId}/timeline`);
-    return response.data;
-};
-
-/**
- * Obtiene los datos punto por punto.
- * 
- * @param matchId - ID del partido
- * @param setNumber - Filtrar por número de set (opcional)
- * @returns Datos punto por punto
- */
-export const fetchMatchPointByPoint = async (
-    matchId: number,
-    setNumber?: number
-): Promise<PointByPointData> => {
-    const params = setNumber ? { set_number: setNumber } : {};
-    const response = await apiClient.get<PointByPointData>(`/matches/${matchId}/pbp`, { params });
-    return response.data;
-};
-
-/**
  * Tipo para las cuotas detalladas de bookmakers
  */
 export interface DetailedOddsResponse {
@@ -107,18 +80,11 @@ export interface DetailedOddsResponse {
 
 /**
  * Obtiene las cuotas detalladas de todas las casas de apuestas.
- * 
+ *
  * @param matchId - ID del partido
  * @returns Cuotas ordenadas de mejor a peor
  */
 export const fetchMatchOddsDetailed = async (matchId: number): Promise<DetailedOddsResponse> => {
     const response = await apiClient.get<DetailedOddsResponse>(`/matches/${matchId}/odds`);
     return response.data;
-};
-
-export default {
-    fetchMatchFull,
-    fetchMatchTimeline,
-    fetchMatchPointByPoint,
-    fetchMatchOddsDetailed,
 };

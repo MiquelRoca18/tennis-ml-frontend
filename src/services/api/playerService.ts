@@ -1,4 +1,4 @@
-import { PlayerProfile, PlayerMatchesResponse, PlayerStatsResponse, PlayerUpcomingResponse } from '../../types/api';
+import { PlayerProfile, PlayerMatchesResponse, PlayerUpcomingResponse } from '../../types/api';
 import apiClient from './apiClient';
 
 /** Normalize backend player response (DB columns: country, atp_points) to PlayerProfile shape */
@@ -84,30 +84,3 @@ export const fetchPlayerUpcoming = async (
     }
 };
 
-/**
- * Fetch player statistics
- * @param playerKey - Player ID
- * @param surface - Filter by surface
- * @param season - Filter by season
- * @returns Promise with player stats, or null if 404 (jugador sin estadísticas)
- */
-export const fetchPlayerStats = async (
-    playerKey: number,
-    surface?: string,
-    season?: number
-): Promise<PlayerStatsResponse | null> => {
-    const params: any = {};
-    if (surface) params.surface = surface;
-    if (season) params.season = season;
-
-    try {
-        const response = await apiClient.get<PlayerStatsResponse>(
-            `/players/${playerKey}/stats`,
-            { params }
-        );
-        return response.data;
-    } catch {
-        // 404 = sin estadísticas; 500 = error en backend. No romper el perfil.
-        return null;
-    }
-};

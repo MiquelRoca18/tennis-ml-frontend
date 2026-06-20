@@ -47,40 +47,10 @@ export function addDays(date: Date, days: number): Date {
 }
 
 /**
- * Dada una fecha YYYY-MM-DD, devuelve la fecha N días antes/después en YYYY-MM-DD.
- */
-export function addDaysToDateString(dateString: string, days: number): string {
-    const d = parseLocalDate(dateString);
-    return formatDateToISO(addDays(d, days));
-}
-
-/**
  * Check if a date string is today
  */
 export function isToday(dateString: string): boolean {
     return dateString === getTodayDate();
-}
-
-/**
- * Check if a date string is in the past
- */
-export function isPast(dateString: string): boolean {
-    const date = parseLocalDate(dateString);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    date.setHours(0, 0, 0, 0);
-    return date < today;
-}
-
-/**
- * Check if a date string is in the future
- */
-export function isFuture(dateString: string): boolean {
-    const date = parseLocalDate(dateString);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    date.setHours(0, 0, 0, 0);
-    return date > today;
 }
 
 /**
@@ -141,15 +111,6 @@ export function formatDateShort(dateString: string): { dayName: string; dayNumbe
         dayName: dayNames[date.getDay()],
         dayNumber: String(date.getDate()),
     };
-}
-
-/**
- * Format day of week in Spanish
- */
-export function formatDayOfWeek(dateString: string): string {
-    const date = parseLocalDate(dateString);
-    const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-    return dayNames[date.getDay()];
 }
 
 /**

@@ -107,9 +107,6 @@ class Cache {
 // Create cache instances with different TTLs and bounded sizes (LRU).
 // Los maxEntries se eligen para cubrir sesiones de uso intenso sin crecer sin control.
 export const playerCache = new Cache(10, 200); // 10 min, hasta 200 jugadores
-export const h2hCache = new Cache(30, 100); // 30 min, hasta 100 H2Hs cacheados
-export const matchCache = new Cache(5, 200); // 5 min, hasta 200 partidos
-export const tournamentCache = new Cache(60, 50); // 1 hora, hasta 50 torneos
 export const upcomingCache = new Cache(10, 50); // 10 min, hasta 50 listas de upcoming
 
 /**
@@ -137,30 +134,6 @@ export async function fetchWithCache<T>(
     cache.set(key, data);
 
     return data;
-}
-
-/**
- * Clear all caches
- */
-export function clearAllCaches(): void {
-    playerCache.clear();
-    h2hCache.clear();
-    matchCache.clear();
-    tournamentCache.clear();
-    upcomingCache.clear();
-}
-
-/**
- * Get stats for all caches
- */
-export function getAllCacheStats() {
-    return {
-        player: playerCache.getStats(),
-        h2h: h2hCache.getStats(),
-        match: matchCache.getStats(),
-        tournament: tournamentCache.getStats(),
-        upcoming: upcomingCache.getStats(),
-    };
 }
 
 export default Cache;

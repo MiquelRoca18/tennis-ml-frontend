@@ -274,18 +274,3 @@ export const getShortName = (name: string): string => {
     const parts = name.split(' ');
     return parts[parts.length - 1];
 };
-
-/** Formato de set score para display */
-export const formatSetScore = (set: SetScore): string => {
-    const base = `${set.player1_games}-${set.player2_games}`;
-    if (set.tiebreak_score) {
-        return `${base}(${set.tiebreak_score})`;
-    }
-    return base;
-};
-
-/** Calcula porcentaje seguro */
-export const safePercentage = (value: number, total: number): number => {
-    if (total === 0) return 0;
-    return Math.round((value / total) * 100);
-};

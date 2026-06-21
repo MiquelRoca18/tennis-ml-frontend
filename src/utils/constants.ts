@@ -1,6 +1,9 @@
 
 // API Configuration
-export const API_BASE_URL = 'https://tennis-ml-predictor-production.up.railway.app';
+// La URL del backend se toma de EXPO_PUBLIC_API_URL (inyectada en build por Vercel/EAS).
+// Fallback: Railway (mantiene compatibilidad con builds/instalaciones que aún no la definen).
+export const API_BASE_URL =
+  process.env.EXPO_PUBLIC_API_URL ?? 'https://tennis-ml-predictor-production.up.railway.app';
 /** Base URL para fotos de jugadores (API-Tennis). Si logo_url viene solo como "12345_nombre.jpg", se resuelve aquí. */
 export const PLAYER_LOGO_BASE_URL = 'https://api.api-tennis.com/logo-tennis';
 

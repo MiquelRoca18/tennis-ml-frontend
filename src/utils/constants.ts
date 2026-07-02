@@ -1,7 +1,8 @@
 
 // API Configuration
 // La URL del backend se toma de EXPO_PUBLIC_API_URL (inyectada en build por Vercel/EAS).
-// Fallback: Railway (mantiene compatibilidad con builds/instalaciones que aún no la definen).
+// Fallback: el servidor propio (CasaOS vía Tailscale Funnel). Migrado desde Railway (jul 2026);
+// Railway ya no se usa como backend.
 export const API_BASE_URL =
   process.env.EXPO_PUBLIC_API_URL ?? 'https://panaderiaroca.tail739b56.ts.net';
 /** Base URL para fotos de jugadores (API-Tennis). Si logo_url viene solo como "12345_nombre.jpg", se resuelve aquí. */

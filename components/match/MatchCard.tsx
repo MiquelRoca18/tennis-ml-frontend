@@ -8,7 +8,7 @@ import { fetchPlayerLookup } from '../../src/services/api/playerService';
 import { Match } from '../../src/types/api';
 import { COLORS, EV_THRESHOLD_BET, EV_THRESHOLD_MARGINAL } from '../../src/utils/constants';
 import { formatSeed, getCountryFlagSafe } from '../../src/utils/countryUtils';
-import { formatMatchStatusForMatch, formatMatchTime, formatOdds, formatPercentage, formatProbability } from '../../src/utils/formatters';
+import { formatMatchStatusForMatch, formatMatchTime, formatOdds, formatPercentage, formatProbability, isAbstention } from '../../src/utils/formatters';
 import CompletedMatchScore from './CompletedMatchScore';
 import LiveBadge from './LiveBadge';
 import PlayerLogo from './PlayerLogo';
@@ -41,7 +41,11 @@ function MatchCardBase({ match, onPress, onFavoriteRemoved }: MatchCardProps) {
     // muestra "Anulado" en vez de "Finalizado".
     const matchStatus = formatMatchStatusForMatch(match);
     const hasPrediction = prediccion != null && typeof prediccion === 'object' && prediccion.jugador1_probabilidad != null;
+    // El modelo Challenger se abstiene (50/50 exacto) fuera de su nicho o sin ranking: eso NO es
+    // una predicción real. En ese caso mostramos las cuotas + "Sin predicción" en vez de "50%/50%".
+    const modelAbstains = isAbstention(prediccion?.jugador1_probabilidad, prediccion?.jugador2_probabilidad);
     const shouldShowPrediction = estado === 'pendiente' && !showLiveOnCard && hasPrediction;
+    const showModelPrediction = shouldShowPrediction && !modelAbstains;
 
     const scoresForDisplay = resultado?.scores ?? null;
     const currentServer = resultado?.scores?.live?.current_server ?? null;
@@ -207,7 +211,7 @@ function MatchCardBase({ match, onPress, onFavoriteRemoved }: MatchCardProps) {
                                         playerIndex={1}
                                         isLive={showLiveOnCard}
                                     />
-                                ) : shouldShowPrediction && prediccion ? (
+                                ) : showModelPrediction && prediccion ? (
                                     <Text style={styles.probability}>{formatProbability(prediccion.jugador1_probabilidad)}</Text>
                                 ) : jugador1.cuota > 0 ? (
                                     <Text style={styles.odds}>@{formatOdds(jugador1.cuota)}</Text>
@@ -256,7 +260,7 @@ function MatchCardBase({ match, onPress, onFavoriteRemoved }: MatchCardProps) {
                                         playerIndex={2}
                                         isLive={showLiveOnCard}
                                     />
-                                ) : shouldShowPrediction && prediccion ? (
+                                ) : showModelPrediction && prediccion ? (
                                     <Text style={styles.probability}>{formatProbability(prediccion.jugador2_probabilidad)}</Text>
                                 ) : jugador2.cuota > 0 ? (
                                     <Text style={styles.odds}>@{formatOdds(jugador2.cuota)}</Text>
@@ -265,8 +269,15 @@ function MatchCardBase({ match, onPress, onFavoriteRemoved }: MatchCardProps) {
                         </View>
                     </>
 
+                    {/* Abstención del modelo (Challenger fuera de nicho / sin ranking): sin 50/50 ni EV. */}
+                    {shouldShowPrediction && modelAbstains && (
+                        <View style={styles.footer}>
+                            <Text style={styles.noPredictionText}>Sin predicción del modelo</Text>
+                        </View>
+                    )}
+
                     {/* Footer - EV, badge APOSTAR y cantidad sugerida */}
-                    {shouldShowPrediction && prediccion && (
+                    {showModelPrediction && prediccion && (
                         <View style={styles.footer}>
                             {/* APOSTAR badge */}
                             {isApostar && (
@@ -444,6 +455,11 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: COLORS.textSecondary,
         fontWeight: '600',
+    },
+    noPredictionText: {
+        fontSize: 12,
+        color: COLORS.textMuted,
+        fontStyle: 'italic',
     },
     score: {
         fontSize: 18,

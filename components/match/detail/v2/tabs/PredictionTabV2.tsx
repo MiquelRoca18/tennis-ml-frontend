@@ -15,6 +15,7 @@ import { useAuth } from '../../../../../src/contexts/AuthContext';
 import { useBankroll } from '../../../../../src/contexts/BankrollContext';
 import { MatchFullResponse, getShortName } from '../../../../../src/types/matchDetail';
 import { COLORS } from '../../../../../src/utils/constants';
+import { isAbstention } from '../../../../../src/utils/formatters';
 import RegisterBetModal from '../../../RegisterBetModal';
 
 interface PredictionTabV2Props {
@@ -41,6 +42,23 @@ function PredictionTabV2Base({ data, scrollable = true, onBetPlaced }: Predictio
                 <Text style={styles.emptyTitle}>Predicción No Disponible</Text>
                 <Text style={styles.emptyText}>
                     Nuestro modelo aún no ha generado una predicción para este partido.
+                </Text>
+            </View>
+        );
+    }
+
+    // Abstención: el modelo devuelve 50/50 exacto cuando el partido queda fuera de su alcance
+    // (Challenger fuera del nicho o sin ranking). No es un 50/50 real → lo decimos claramente en
+    // vez de mostrar "Ganador predicho: X con 50% de probabilidad".
+    if (isAbstention(prediction.probability_player1, prediction.probability_player2)) {
+        return (
+            <View style={styles.emptyContainer}>
+                <Text style={styles.emptyIcon}>🤖</Text>
+                <Text style={styles.emptyTitle}>Sin predicción para este partido</Text>
+                <Text style={styles.emptyText}>
+                    Este partido queda fuera del alcance del modelo (por ejemplo, un Challenger fuera
+                    de su nicho o sin ranking disponible). El modelo se abstiene en lugar de adivinar,
+                    así que no da una probabilidad para no ofrecerte un 50/50 sin fundamento.
                 </Text>
             </View>
         );

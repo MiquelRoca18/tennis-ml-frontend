@@ -58,6 +58,24 @@ export const formatProbability = (value: number | null | undefined): string => {
 };
 
 /**
+ * Detecta una ABSTENCIÓN del modelo (no una predicción real de 50/50).
+ *
+ * El modelo Challenger devuelve EXACTAMENTE 50%/50% cuando el partido cae fuera de su
+ * nicho (top-150 vs 300+) o le falta ranking → el backend responde con `_skip_response`
+ * (prob 0.5 / 0.5). Una predicción real nunca produce 0.5000 exacto, así que basta con
+ * comprobar que ambas probabilidades son exactamente 0.5. Acepta escala 0-1 (0.5) y
+ * 0-100 (50). En esos casos la UI debe mostrar "Sin predicción", no "50% / 50%".
+ */
+export const isAbstention = (
+    prob1: number | null | undefined,
+    prob2: number | null | undefined,
+): boolean => {
+    if (typeof prob1 !== 'number' || typeof prob2 !== 'number') return false;
+    const norm = (v: number): number => (v > 1 ? v / 100 : v);
+    return norm(prob1) === 0.5 && norm(prob2) === 0.5;
+};
+
+/**
  * Format odds
  * @param odds - Odds value
  * @returns Formatted odds (e.g., "1.75" or "2.10")

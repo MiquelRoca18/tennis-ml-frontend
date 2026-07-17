@@ -14,6 +14,8 @@ import { useAuth } from '../src/contexts/AuthContext';
 import { useBankroll } from '../src/contexts/BankrollContext';
 import { useDialog } from '../src/contexts/DialogContext';
 import { fetchBettingSettings, updateBettingBankroll } from '../src/services/api/matchService';
+import { useBookmakerPrefs } from '../src/hooks/useBookmakerPrefs';
+import { KNOWN_BOOKMAKERS, bookmakerLabel } from '../src/lib/bookmakers';
 import { COLORS } from '../src/utils/constants';
 
 export default function SettingsScreen() {
@@ -24,6 +26,7 @@ export default function SettingsScreen() {
   const [bankroll, setBankroll] = useState<string>('');
   const [bankrollLoading, setBankrollLoading] = useState(true);
   const [bankrollSaving, setBankrollSaving] = useState(false);
+  const { bookmakers, toggle: toggleBookmaker } = useBookmakerPrefs();
 
   const loadBettingSettings = useCallback(async () => {
     if (user) return;
@@ -122,6 +125,32 @@ export default function SettingsScreen() {
               </TouchableOpacity>
             </>
           )}
+        </View>
+
+        <Text style={styles.sectionTitle}>Mis casas de apuestas</Text>
+        <View style={styles.card}>
+          <Text style={styles.cardHint}>
+            Elige las casas donde apuestas y te mostraremos la mejor cuota entre ellas en cada
+            recomendación. Sin selección = comparamos todas.
+          </Text>
+          <View style={styles.chipsWrap}>
+            {KNOWN_BOOKMAKERS.map((bm) => {
+              const selected = bookmakers.has(bm);
+              return (
+                <TouchableOpacity
+                  key={bm}
+                  style={[styles.chip, selected && styles.chipSelected]}
+                  onPress={() => toggleBookmaker(bm)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                >
+                  <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
+                    {bookmakerLabel(bm)}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
 
         <Text style={styles.sectionTitle}>App</Text>
@@ -236,6 +265,31 @@ const styles = StyleSheet.create({
   },
   loader: {
     marginVertical: 16,
+  },
+  chipsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  chip: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.background,
+  },
+  chipSelected: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  chipText: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    fontWeight: '500',
+  },
+  chipTextSelected: {
+    color: '#fff',
   },
   row: {
     flexDirection: 'row',

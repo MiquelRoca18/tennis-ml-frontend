@@ -29,7 +29,8 @@ export interface ArbitrageResponse {
   arbs: Arb[];
 }
 
-export const fetchArbitrage = async (bankroll: number): Promise<ArbitrageResponse> => {
+export const fetchArbitrage = async (bankroll = 100): Promise<ArbitrageResponse> => {
+  // El bankroll no afecta a la detección (solo al reparto, que se recalcula en cliente).
   const response = await apiClient.get<ArbitrageResponse>('/arbitrage', {
     params: { bankroll },
   });

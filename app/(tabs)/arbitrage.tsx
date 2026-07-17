@@ -5,7 +5,7 @@
  * haber desaparecido. Copy honesto sobre las pegas reales (la casa anula, te limitan).
  */
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { useArbitrage } from '../../src/hooks/useArbitrage';
 import type { Arb } from '../../src/services/api/arbitrageService';
+import { computeArbSplit } from '../../src/lib/arb';
 import { bookmakerLabel } from '../../src/lib/bookmakers';
 import { COLORS } from '../../src/utils/constants';
 
@@ -31,8 +32,9 @@ function playerForSide(arb: Arb, side: number): string {
 
 export default function ArbitrageScreen() {
   const [bankrollInput, setBankrollInput] = useState('100');
-  const [bankroll, setBankroll] = useState(100);
-  const { data, loading, error, refresh } = useArbitrage(bankroll);
+  // El reparto se recalcula en vivo con este bankroll (sin refetch); la detección no depende de él.
+  const bankroll = useMemo(() => parseBankroll(bankrollInput), [bankrollInput]);
+  const { data, loading, error, refresh } = useArbitrage();
 
   const arbs = data?.arbs ?? [];
   const staleMinutes = data?.stale_minutes ?? null;
@@ -68,7 +70,6 @@ export default function ArbitrageScreen() {
             style={styles.bankrollInput}
             value={bankrollInput}
             onChangeText={setBankrollInput}
-            onEndEditing={() => setBankroll(parseBankroll(bankrollInput))}
             keyboardType="decimal-pad"
             placeholder="100"
             placeholderTextColor={COLORS.textMuted}
@@ -90,27 +91,37 @@ export default function ArbitrageScreen() {
             <Text style={styles.emptyText}>Es lo normal: aparecen pocas veces y duran poco. Vuelve más tarde.</Text>
           </View>
         ) : (
-          arbs.map((arb) => (
-            <View key={arb.match_id} style={styles.arbCard}>
-              <View style={styles.arbHeader}>
-                <Text style={styles.arbMatch} numberOfLines={1}>
-                  {playerForSide(arb, 1)} vs {playerForSide(arb, 2)}
-                </Text>
-                <View style={styles.profitBadge}>
-                  <Text style={styles.profitText}>+{arb.profit_pct.toFixed(1)}% garantizado</Text>
+          arbs.map((arb) => {
+            const split = computeArbSplit(arb.legs, bankroll);
+            return (
+              <View key={arb.match_id} style={styles.arbCard}>
+                <View style={styles.arbHeader}>
+                  <Text style={styles.arbMatch} numberOfLines={1}>
+                    {playerForSide(arb, 1)} vs {playerForSide(arb, 2)}
+                  </Text>
+                  <View style={styles.profitBadge}>
+                    <Text style={styles.profitText}>+{arb.profit_pct.toFixed(2)}% garantizado</Text>
+                  </View>
                 </View>
-              </View>
-              {arb.legs.map((leg) => (
-                <View key={leg.side} style={styles.legRow}>
-                  <Text style={styles.legText}>
-                    Apuesta <Text style={styles.legStake}>{leg.stake.toFixed(2)}€</Text> a{' '}
-                    {playerForSide(arb, leg.side)} @ {leg.odds.toFixed(2)} en{' '}
-                    <Text style={styles.legBook}>{bookmakerLabel(leg.bookmaker)}</Text>
+                {split.legs.map((leg) => (
+                  <View key={leg.side} style={styles.legRow}>
+                    <Text style={styles.legText}>
+                      Apuesta <Text style={styles.legStake}>{leg.stake.toFixed(2)}€</Text> a{' '}
+                      {playerForSide(arb, leg.side)} @ {leg.odds.toFixed(2)} en{' '}
+                      <Text style={styles.legBook}>{bookmakerLabel(leg.bookmaker)}</Text>
+                    </Text>
+                  </View>
+                ))}
+                <View style={styles.profitRow}>
+                  <Text style={styles.profitLine}>
+                    Ganancia: <Text style={styles.profitLineValue}>{split.profit.toFixed(2)}€</Text>
+                    {'  ·  recuperas '}
+                    {split.guaranteedReturn.toFixed(2)}€
                   </Text>
                 </View>
-              ))}
-            </View>
-          ))
+              </View>
+            );
+          })
         )}
       </ScrollView>
     </View>
@@ -184,4 +195,11 @@ const styles = StyleSheet.create({
   legText: { fontSize: 14, color: COLORS.textPrimary, lineHeight: 20 },
   legStake: { fontWeight: '800', color: COLORS.primary },
   legBook: { fontWeight: '700', color: COLORS.textPrimary },
+  profitRow: {
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    paddingTop: 8,
+  },
+  profitLine: { fontSize: 14, fontWeight: '600', color: COLORS.textSecondary },
+  profitLineValue: { fontWeight: '800', color: COLORS.success },
 });

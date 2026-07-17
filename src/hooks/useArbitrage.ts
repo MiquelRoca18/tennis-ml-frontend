@@ -9,7 +9,7 @@ import { fetchArbitrage, type ArbitrageResponse } from '../services/api/arbitrag
 
 const REFRESH_MS = 60_000;
 
-export function useArbitrage(bankroll: number) {
+export function useArbitrage() {
   const [data, setData] = useState<ArbitrageResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -17,13 +17,13 @@ export function useArbitrage(bankroll: number) {
   const load = useCallback(async () => {
     try {
       setError(null);
-      setData(await fetchArbitrage(bankroll));
+      setData(await fetchArbitrage());
     } catch (e: any) {
       setError(e?.message ?? 'Error cargando arbitrajes');
     } finally {
       setLoading(false);
     }
-  }, [bankroll]);
+  }, []);
 
   useEffect(() => {
     void load();

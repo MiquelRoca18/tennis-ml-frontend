@@ -67,6 +67,15 @@ function TabsWithBadge() {
         }}
       />
       <Tabs.Screen
+        name="arbitrage"
+        options={{
+          title: 'Arbitraje',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="swap-horizontal" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="explore"
         options={{
           title: 'Torneos',

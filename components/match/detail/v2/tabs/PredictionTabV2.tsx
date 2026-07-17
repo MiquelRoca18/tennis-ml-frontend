@@ -16,6 +16,10 @@ import { useBankroll } from '../../../../../src/contexts/BankrollContext';
 import { MatchFullResponse, getShortName } from '../../../../../src/types/matchDetail';
 import { COLORS } from '../../../../../src/utils/constants';
 import { isAbstention } from '../../../../../src/utils/formatters';
+import { useBookmakerPrefs } from '../../../../../src/hooks/useBookmakerPrefs';
+import { useMatchOdds } from '../../../../../src/hooks/useMatchOdds';
+import { bestOdds } from '../../../../../src/lib/bestOdds';
+import { bookmakerLabel } from '../../../../../src/lib/bookmakers';
 import RegisterBetModal from '../../../RegisterBetModal';
 
 interface PredictionTabV2Props {
@@ -31,6 +35,13 @@ function PredictionTabV2Base({ data, scrollable = true, onBetPlaced }: Predictio
     const { saveBankroll, bankroll: currentBankroll } = useBankroll();
     const [showRegisterBetModal, setShowRegisterBetModal] = useState(false);
     const { prediction, player1, player2, odds, match: matchInfo } = data;
+
+    // best-odds (line-shopping, SP2): cuotas multi-casa para el lado recomendado.
+    // Los hooks van antes de los early returns (reglas de hooks). Solo pedimos cuotas si
+    // hay lado recomendado.
+    const { bookmakers } = useBookmakerPrefs();
+    const recommendedSide = prediction?.recommended_bet_side ?? null;
+    const { data: bestOddsData } = useMatchOdds(recommendedSide ? matchInfo?.id : undefined);
 
     const p1Short = getShortName(player1.name);
     const p2Short = getShortName(player2.name);
@@ -79,6 +90,13 @@ function PredictionTabV2Base({ data, scrollable = true, onBetPlaced }: Predictio
     // Hay recomendación de apostar si el texto contiene "apostar" pero no es "NO APOSTAR"
     const recLower = recommendationText.toLowerCase();
     const hasBetRecommendation = recLower.includes('apostar') && !recLower.startsWith('no');
+
+    // Mejor cuota para el lado recomendado, entre las casas del usuario (o todas si no ha
+    // elegido). Sin datos multi-casa (o backend sin desplegar aún) → undefined, no se muestra.
+    const userBest =
+        recommendedSide && bestOddsData
+            ? bestOdds(bestOddsData.books, bookmakers.size > 0 ? bookmakers : undefined)[recommendedSide]
+            : undefined;
 
     const openRegisterBetModal = () => {
         if (!hasBetRecommendation || !matchInfo?.id) return;
@@ -161,6 +179,14 @@ function PredictionTabV2Base({ data, scrollable = true, onBetPlaced }: Predictio
                         <Text style={styles.stakeValue}>—</Text>
                     )}
                 </Text>
+                {hasBetRecommendation && userBest && (
+                    <Text style={styles.bestOddsLine}>
+                        Mejor cuota:{' '}
+                        <Text style={styles.bestOddsValue}>{userBest.odds.toFixed(2)}</Text>
+                        {' '}en {bookmakerLabel(userBest.bookmaker)}
+                        {bookmakers.size > 0 ? ' (entre tus casas)' : ''}
+                    </Text>
+                )}
             </View>
 
             {/* Botón Registrar apuesta */}
@@ -415,6 +441,16 @@ const styles = StyleSheet.create({
     stakeValue: {
         fontWeight: '800',
         color: COLORS.success,
+    },
+    bestOddsLine: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: COLORS.textSecondary,
+        marginTop: 8,
+    },
+    bestOddsValue: {
+        fontWeight: '800',
+        color: COLORS.primary,
     },
 
     // Value Bet Card

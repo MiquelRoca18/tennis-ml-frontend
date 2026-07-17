@@ -88,3 +88,27 @@ export const fetchMatchOddsDetailed = async (matchId: number): Promise<DetailedO
     const response = await apiClient.get<DetailedOddsResponse>(`/matches/${matchId}/odds`);
     return response.data;
 };
+
+/** Fila de cuota por casa y lado (tabla match_odds del backend). */
+export interface OddsBook {
+    bookmaker: string;
+    side: number; // 1 = jugador1, 2 = jugador2
+    odds: number;
+}
+
+/** Respuesta de /matches/{id}/best-odds: cuotas multi-casa + mejor por lado. */
+export interface MatchBestOddsResponse {
+    match_id: number;
+    books: OddsBook[];
+    /** Mejor cuota por lado calculada en el servidor (claves "1"/"2"). El cliente recalcula por casas del usuario. */
+    best: Record<string, { odds: number; bookmaker: string }>;
+}
+
+/**
+ * Cuotas multi-casa del partido (tabla match_odds, poblada por el sync) para line-shopping.
+ * El cliente filtra luego por las casas del usuario con bestOdds().
+ */
+export const fetchMatchBestOdds = async (matchId: number): Promise<MatchBestOddsResponse> => {
+    const response = await apiClient.get<MatchBestOddsResponse>(`/matches/${matchId}/best-odds`);
+    return response.data;
+};

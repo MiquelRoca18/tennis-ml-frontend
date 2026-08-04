@@ -5,9 +5,11 @@
  * haber desaparecido. Copy honesto sobre las pegas reales (la casa anula, te limitan).
  */
 
+import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -31,6 +33,7 @@ function playerForSide(arb: Arb, side: number): string {
 }
 
 export default function ArbitrageScreen() {
+  const router = useRouter();
   const [bankrollInput, setBankrollInput] = useState('100');
   // El reparto se recalcula en vivo con este bankroll (sin refetch); la detección no depende de él.
   const bankroll = useMemo(() => parseBankroll(bankrollInput), [bankrollInput]);
@@ -94,7 +97,16 @@ export default function ArbitrageScreen() {
           arbs.map((arb) => {
             const split = computeArbSplit(arb.legs, bankroll);
             return (
-              <View key={arb.match_id} style={styles.arbCard}>
+              // Cada tarjeta es un partido → se puede entrar a su detalle (mismo patrón que "Mis apuestas").
+              <Pressable
+                key={arb.match_id}
+                style={({ pressed }) => [styles.arbCard, pressed && styles.arbCardPressed]}
+                onPress={() =>
+                  router.push({ pathname: '/match/[id]', params: { id: String(arb.match_id) } })
+                }
+                accessibilityRole="button"
+                accessibilityLabel={`Ver detalle de ${playerForSide(arb, 1)} contra ${playerForSide(arb, 2)}`}
+              >
                 <View style={styles.arbHeader}>
                   <Text style={styles.arbMatch} numberOfLines={1}>
                     {playerForSide(arb, 1)} vs {playerForSide(arb, 2)}
@@ -102,6 +114,8 @@ export default function ArbitrageScreen() {
                   <View style={styles.profitBadge}>
                     <Text style={styles.profitText}>+{arb.profit_pct.toFixed(2)}% garantizado</Text>
                   </View>
+                  {/* Afordancia: indica que la tarjeta lleva al detalle del partido */}
+                  <Text style={styles.chevron}>›</Text>
                 </View>
                 {split.legs.map((leg) => (
                   <View key={leg.side} style={styles.legRow}>
@@ -119,7 +133,7 @@ export default function ArbitrageScreen() {
                     {split.guaranteedReturn.toFixed(2)}€
                   </Text>
                 </View>
-              </View>
+              </Pressable>
             );
           })
         )}
@@ -178,8 +192,10 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     gap: 10,
   },
+  arbCardPressed: { opacity: 0.85 },
   arbHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   arbMatch: { flex: 1, fontSize: 15, fontWeight: '700', color: COLORS.textPrimary },
+  chevron: { fontSize: 22, lineHeight: 22, fontWeight: '600', color: COLORS.textMuted },
   profitBadge: {
     backgroundColor: COLORS.success + '22',
     paddingHorizontal: 10,

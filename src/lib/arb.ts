@@ -48,3 +48,16 @@ export function computeArbSplit(
     profitPct: (1 / inv - 1) * 100,
   };
 }
+
+/**
+ * ¿Puede el usuario ejecutar este arbitraje de verdad?
+ *
+ * Hacen falta LAS DOS casas: con una sola accesible no hay beneficio garantizado, solo una
+ * apuesta suelta a la que le falta la cobertura del otro lado.
+ */
+export function isArbExecutable(
+  arb: { legs: { bookmaker: string }[] },
+  casas: Set<string>,
+): boolean {
+  return arb.legs.length > 0 && arb.legs.every((leg) => casas.has(leg.bookmaker));
+}

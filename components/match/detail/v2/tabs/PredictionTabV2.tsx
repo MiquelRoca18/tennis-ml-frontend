@@ -16,7 +16,7 @@ import { useBankroll } from '../../../../../src/contexts/BankrollContext';
 import { MatchFullResponse, getShortName } from '../../../../../src/types/matchDetail';
 import { COLORS } from '../../../../../src/utils/constants';
 import { isAbstention } from '../../../../../src/utils/formatters';
-import { useBookmakerPrefs } from '../../../../../src/hooks/useBookmakerPrefs';
+import { useEffectiveBookmakers } from '../../../../../src/hooks/useEffectiveBookmakers';
 import { useMatchOdds } from '../../../../../src/hooks/useMatchOdds';
 import { bestOdds } from '../../../../../src/lib/bestOdds';
 import { bookmakerLabel } from '../../../../../src/lib/bookmakers';
@@ -39,7 +39,7 @@ function PredictionTabV2Base({ data, scrollable = true, onBetPlaced }: Predictio
     // best-odds (line-shopping, SP2): cuotas multi-casa para el lado recomendado.
     // Los hooks van antes de los early returns (reglas de hooks). Solo pedimos cuotas si
     // hay lado recomendado.
-    const { bookmakers } = useBookmakerPrefs();
+    const casas = useEffectiveBookmakers();
     const recommendedSide = prediction?.recommended_bet_side ?? null;
     const { data: bestOddsData } = useMatchOdds(recommendedSide ? matchInfo?.id : undefined);
 
@@ -91,12 +91,29 @@ function PredictionTabV2Base({ data, scrollable = true, onBetPlaced }: Predictio
     const recLower = recommendationText.toLowerCase();
     const hasBetRecommendation = recLower.includes('apostar') && !recLower.startsWith('no');
 
-    // Mejor cuota para el lado recomendado, entre las casas del usuario (o todas si no ha
-    // elegido). Sin datos multi-casa (o backend sin desplegar aún) → undefined, no se muestra.
+    // Mejor cuota para el lado recomendado entre las casas donde el usuario PUEDE apostar.
+    // Sin datos multi-casa (o backend sin desplegar aún) → undefined, no se muestra.
     const userBest =
         recommendedSide && bestOddsData
-            ? bestOdds(bestOddsData.books, bookmakers.size > 0 ? bookmakers : undefined)[recommendedSide]
+            ? bestOdds(bestOddsData.books, casas)[recommendedSide]
             : undefined;
+
+    // Mejor cuota del mercado completo. Solo se enseña cuando está en una casa que el
+    // usuario no tiene, para que vea el margen que pierde sin ofrecerle un precio irreal.
+    const marketBest =
+        recommendedSide && bestOddsData
+            ? bestOdds(bestOddsData.books)[recommendedSide]
+            : undefined;
+    const marketBetter = marketBest && userBest && marketBest.odds > userBest.odds
+        ? marketBest
+        : undefined;
+
+    // EV a la cuota que el usuario puede conseguir de verdad. Solo informativo: la
+    // recomendación guardada no cambia (se calcula con la cuota de mercado global).
+    // Usa la probabilidad del lado APOSTADO, que no siempre es el ganador predicho.
+    const probApostada =
+        recommendedSide === 1 ? prediction.probability_player1 : prediction.probability_player2;
+    const evReal = userBest ? (probApostada / 100) * userBest.odds - 1 : undefined;
 
     const openRegisterBetModal = () => {
         if (!hasBetRecommendation || !matchInfo?.id) return;
@@ -180,12 +197,25 @@ function PredictionTabV2Base({ data, scrollable = true, onBetPlaced }: Predictio
                     )}
                 </Text>
                 {hasBetRecommendation && userBest && (
-                    <Text style={styles.bestOddsLine}>
-                        Mejor cuota:{' '}
-                        <Text style={styles.bestOddsValue}>{userBest.odds.toFixed(2)}</Text>
-                        {' '}en {bookmakerLabel(userBest.bookmaker)}
-                        {bookmakers.size > 0 ? ' (entre tus casas)' : ''}
-                    </Text>
+                    <>
+                        <Text style={styles.bestOddsLine}>
+                            Mejor cuota:{' '}
+                            <Text style={styles.bestOddsValue}>{userBest.odds.toFixed(2)}</Text>
+                            {' '}en {bookmakerLabel(userBest.bookmaker)} (entre tus casas)
+                        </Text>
+                        {marketBetter && (
+                            <Text style={styles.marketOddsLine}>
+                                En el mercado hay {marketBetter.odds.toFixed(2)} en{' '}
+                                {bookmakerLabel(marketBetter.bookmaker)}, donde no puedes apostar.
+                            </Text>
+                        )}
+                        {evReal !== undefined && evReal <= 0 && (
+                            <Text style={styles.evWarningLine}>
+                                A tu mejor cuota esta apuesta no tiene valor (EV{' '}
+                                {(evReal * 100).toFixed(1)}%).
+                            </Text>
+                        )}
+                    </>
                 )}
             </View>
 
@@ -451,6 +481,18 @@ const styles = StyleSheet.create({
     bestOddsValue: {
         fontWeight: '800',
         color: COLORS.primary,
+    },
+    marketOddsLine: {
+        fontSize: 12,
+        color: COLORS.textSecondary,
+        marginTop: 4,
+        opacity: 0.8,
+    },
+    evWarningLine: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: COLORS.warning,
+        marginTop: 4,
     },
 
     // Value Bet Card

@@ -1,4 +1,4 @@
-import { computeArbSplit } from '../arb';
+import { computeArbSplit, isArbExecutable } from '../arb';
 
 /**
  * Reparto de stake + ganancia de un arbitraje, calculado EN CLIENTE para cualquier bankroll.
@@ -48,5 +48,21 @@ describe('computeArbSplit', () => {
     const r = computeArbSplit([], 100);
     expect(r.profit).toBe(0);
     expect(r.guaranteedReturn).toBe(0);
+  });
+});
+
+describe('isArbExecutable', () => {
+  const arb = { legs: [{ bookmaker: 'bet365' }, { bookmaker: 'Pncl' }] };
+
+  it('no es ejecutable si solo una casa es del usuario', () => {
+    expect(isArbExecutable(arb, new Set(['bet365']))).toBe(false);
+  });
+
+  it('es ejecutable cuando las dos casas son del usuario', () => {
+    expect(isArbExecutable(arb, new Set(['bet365', 'Pncl']))).toBe(true);
+  });
+
+  it('no es ejecutable sin casas seleccionadas', () => {
+    expect(isArbExecutable(arb, new Set())).toBe(false);
   });
 });

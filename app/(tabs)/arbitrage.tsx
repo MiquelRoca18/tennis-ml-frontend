@@ -18,8 +18,9 @@ import {
   View,
 } from 'react-native';
 import { useArbitrage } from '../../src/hooks/useArbitrage';
+import { useEffectiveBookmakers } from '../../src/hooks/useEffectiveBookmakers';
 import type { Arb } from '../../src/services/api/arbitrageService';
-import { computeArbSplit } from '../../src/lib/arb';
+import { computeArbSplit, isArbExecutable } from '../../src/lib/arb';
 import { bookmakerLabel } from '../../src/lib/bookmakers';
 import { COLORS } from '../../src/utils/constants';
 
@@ -39,14 +40,30 @@ export default function ArbitrageScreen() {
   const bankroll = useMemo(() => parseBankroll(bankrollInput), [bankrollInput]);
   const { data, loading, error, refresh } = useArbitrage();
 
-  const arbs = data?.arbs ?? [];
+  const casas = useEffectiveBookmakers();
   const staleMinutes = data?.stale_minutes ?? null;
+
+  // Los ejecutables primero: son los únicos que el usuario puede aprovechar de verdad. El
+  // resto NO se ocultan — sirven como información de mercado y para ver qué se está perdiendo.
+  const arbs = useMemo(() => {
+    const todos = (data?.arbs ?? []).map((arb) => ({
+      arb,
+      ejecutable: isArbExecutable(arb, casas),
+    }));
+    return todos.sort((a, b) => Number(b.ejecutable) - Number(a.ejecutable));
+  }, [data?.arbs, casas]);
+
+  const ejecutables = arbs.filter((a) => a.ejecutable).length;
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Arbitraje</Text>
-        <Text style={styles.headerSubtitle}>Beneficio garantizado apostando a los dos lados</Text>
+        <Text style={styles.headerSubtitle}>
+          {arbs.length > 0
+            ? `${ejecutables} de ${arbs.length} los puedes ejecutar con tus casas`
+            : 'Beneficio garantizado apostando a los dos lados'}
+        </Text>
       </View>
 
       <ScrollView
@@ -94,13 +111,17 @@ export default function ArbitrageScreen() {
             <Text style={styles.emptyText}>Es lo normal: aparecen pocas veces y duran poco. Vuelve más tarde.</Text>
           </View>
         ) : (
-          arbs.map((arb) => {
+          arbs.map(({ arb, ejecutable }) => {
             const split = computeArbSplit(arb.legs, bankroll);
             return (
               // Cada tarjeta es un partido → se puede entrar a su detalle (mismo patrón que "Mis apuestas").
               <Pressable
                 key={arb.match_id}
-                style={({ pressed }) => [styles.arbCard, pressed && styles.arbCardPressed]}
+                style={({ pressed }) => [
+                  styles.arbCard,
+                  !ejecutable && styles.arbCardInfo,
+                  pressed && styles.arbCardPressed,
+                ]}
                 onPress={() =>
                   router.push({ pathname: '/match/[id]', params: { id: String(arb.match_id) } })
                 }
@@ -133,6 +154,11 @@ export default function ArbitrageScreen() {
                     {split.guaranteedReturn.toFixed(2)}€
                   </Text>
                 </View>
+                {!ejecutable && (
+                  <Text style={styles.infoOnlyNote}>
+                    Solo informativo: necesitas cuenta en las dos casas.
+                  </Text>
+                )}
               </Pressable>
             );
           })
@@ -193,6 +219,13 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   arbCardPressed: { opacity: 0.85 },
+  arbCardInfo: { opacity: 0.55 },
+  infoOnlyNote: {
+    fontSize: 11,
+    color: COLORS.textSecondary,
+    marginTop: 6,
+    fontStyle: 'italic',
+  },
   arbHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   arbMatch: { flex: 1, fontSize: 15, fontWeight: '700', color: COLORS.textPrimary },
   chevron: { fontSize: 22, lineHeight: 22, fontWeight: '600', color: COLORS.textMuted },

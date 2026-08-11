@@ -15,7 +15,13 @@ import { useBankroll } from '../src/contexts/BankrollContext';
 import { useDialog } from '../src/contexts/DialogContext';
 import { fetchBettingSettings, updateBettingBankroll } from '../src/services/api/matchService';
 import { useBookmakerPrefs } from '../src/hooks/useBookmakerPrefs';
-import { KNOWN_BOOKMAKERS, bookmakerLabel } from '../src/lib/bookmakers';
+import { useUserCountry } from '../src/hooks/useUserCountry';
+import {
+  COUNTRIES_LAST_VERIFIED,
+  KNOWN_BOOKMAKERS,
+  availabilityIn,
+  bookmakerLabel,
+} from '../src/lib/bookmakers';
 import { COLORS } from '../src/utils/constants';
 
 export default function SettingsScreen() {
@@ -27,6 +33,7 @@ export default function SettingsScreen() {
   const [bankrollLoading, setBankrollLoading] = useState(true);
   const [bankrollSaving, setBankrollSaving] = useState(false);
   const { bookmakers, toggle: toggleBookmaker } = useBookmakerPrefs();
+  const country = useUserCountry();
 
   const loadBettingSettings = useCallback(async () => {
     if (user) return;
@@ -131,18 +138,27 @@ export default function SettingsScreen() {
         <View style={styles.card}>
           <Text style={styles.cardHint}>
             Elige las casas donde apuestas y te mostraremos la mejor cuota entre ellas en cada
-            recomendación. Sin selección = comparamos todas.
+            recomendación. Las atenuadas no aceptan usuarios de España, pero puedes marcarlas
+            igualmente si tienes cuenta.
           </Text>
           <View style={styles.chipsWrap}>
             {KNOWN_BOOKMAKERS.map((bm) => {
               const selected = bookmakers.has(bm);
+              // Las no disponibles se atenúan, nunca se ocultan ni se bloquean: solo el
+              // usuario sabe dónde tiene cuenta abierta de verdad.
+              const noDisponible = availabilityIn(bm, country) === 'unavailable';
               return (
                 <TouchableOpacity
                   key={bm}
-                  style={[styles.chip, selected && styles.chipSelected]}
+                  style={[
+                    styles.chip,
+                    noDisponible && styles.chipUnavailable,
+                    selected && styles.chipSelected,
+                  ]}
                   onPress={() => toggleBookmaker(bm)}
                   accessibilityRole="button"
                   accessibilityState={{ selected }}
+                  accessibilityHint={noDisponible ? 'No disponible en España' : undefined}
                 >
                   <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
                     {bookmakerLabel(bm)}
@@ -151,6 +167,11 @@ export default function SettingsScreen() {
               );
             })}
           </View>
+          <Text style={styles.cardNote}>
+            Las cuotas provienen del sitio internacional de cada casa; su versión española
+            puede ofrecer un precio distinto. Disponibilidad revisada el{' '}
+            {COUNTRIES_LAST_VERIFIED}.
+          </Text>
         </View>
 
         <Text style={styles.sectionTitle}>App</Text>
@@ -239,6 +260,13 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     lineHeight: 18,
   },
+  cardNote: {
+    fontSize: 11,
+    color: COLORS.textSecondary,
+    marginTop: 14,
+    lineHeight: 16,
+    opacity: 0.8,
+  },
   input: {
     backgroundColor: COLORS.background,
     borderWidth: 1,
@@ -282,6 +310,9 @@ const styles = StyleSheet.create({
   chipSelected: {
     backgroundColor: COLORS.primary,
     borderColor: COLORS.primary,
+  },
+  chipUnavailable: {
+    opacity: 0.45,
   },
   chipText: {
     fontSize: 14,

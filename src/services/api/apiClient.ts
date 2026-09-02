@@ -1,6 +1,7 @@
 import axios, { AxiosError, AxiosInstance } from 'axios';
 import { supabase } from '../../lib/supabase';
 import { API_BASE_URL } from '../../utils/constants';
+import { mensajeNoAutorizado, type EstadoAuth } from './authErrors';
 
 // Create axios instance with default config
 const apiClient: AxiosInstance = axios.create({
@@ -19,15 +20,20 @@ const apiClient: AxiosInstance = axios.create({
 // El backend lo valida cuando AUTH_ENABLED=true; mientras esté en false es inofensivo.
 apiClient.interceptors.request.use(
     async (config) => {
+        // Se anota POR QUÉ no hay token para que un 401 posterior pueda explicarse bien:
+        // no es lo mismo "tu sesión expiró" que "el proveedor de auth no existe".
+        const estado = config as typeof config & EstadoAuth;
         try {
             const { data } = await supabase.auth.getSession();
             const token = data.session?.access_token;
             if (token) {
                 config.headers.Authorization = `Bearer ${token}`;
+            } else {
+                estado.sinSesion = true;
             }
         } catch {
-            // Sin sesión disponible → se envía sin token; el backend responderá 401
-            // si el endpoint lo requiere, y el response interceptor lo traduce.
+            // getSession falla al refrescar contra un proyecto pausado o sin red.
+            estado.authNoAlcanzable = true;
         }
         return config;
     },
@@ -63,7 +69,7 @@ apiClient.interceptors.response.use(
             case 400:
                 throw new Error('Solicitud inválida. Verifica los datos enviados.');
             case 401:
-                throw new Error('Sesión caducada. Vuelve a iniciar sesión.');
+                throw new Error(mensajeNoAutorizado((error.config ?? {}) as EstadoAuth));
             case 403:
                 throw new Error('No tienes acceso a este recurso.');
             case 404:
